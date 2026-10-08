@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
-import { useMidi, useKeyboardOctave } from "../lib/midi";
+import { connectMidi, useMidi, useKeyboardOctave } from "../lib/midi";
+import { synth } from "../lib/audio";
 import { useEngine } from "../lib/engine";
 import { DEMO_SONG, parseMidiFile } from "../lib/song";
 import { setLibraryOpen } from "../lib/ui";
@@ -26,11 +27,15 @@ export function TopBar() {
   const connected = midi.inputs.length > 0;
   const label = connected
     ? midi.inputs[0]
-    : !midi.supported
+    : midi.status === "unsupported"
       ? "No Web MIDI — use computer keys"
       : midi.status === "denied"
-        ? "MIDI access denied"
-        : "No keyboard detected";
+        ? "MIDI blocked — click to retry"
+        : midi.status === "prompt"
+          ? "Allow MIDI in the browser prompt"
+          : midi.status === "ready"
+            ? "No keyboard yet — plug in and click"
+            : "Click to connect MIDI keyboard";
 
   return (
     <header className="glass pointer-events-auto flex flex-wrap items-center justify-between gap-3 rounded-2xl px-4 py-2.5">
@@ -48,16 +53,21 @@ export function TopBar() {
 
       <div className="flex flex-wrap items-center gap-2">
         {error && <span className="text-xs text-rose-300">{error}</span>}
-        <div
-          className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium ${
-            connected ? "bg-emerald-400/15 text-emerald-200" : "bg-white/6 text-white/50"
+        <button
+          type="button"
+          onClick={() => {
+            synth.unlock();
+            void connectMidi();
+          }}
+          className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium transition ${
+            connected ? "bg-emerald-400/15 text-emerald-200" : "bg-white/6 text-white/50 hover:bg-white/10 hover:text-white"
           }`}
-          title="Computer keys: A–; (white/black via W E T Y U O P). Z/X shift octave."
+          title="Click to allow MIDI. Computer keys: A S D F G H J K L ; (W E T Y U O P for black keys). Z / X change octave."
         >
           <span className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-400 shadow-[0_0_8px_#34d399]" : "bg-white/30"}`} />
           {label}
-          {!connected && <span className="text-white/30">· oct {octave}</span>}
-        </div>
+          <span className="text-white/35">· computer keys C{octave}</span>
+        </button>
         <SoundPanel />
         <button
           onClick={() => setLibraryOpen(true)}

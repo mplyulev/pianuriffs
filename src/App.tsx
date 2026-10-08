@@ -14,7 +14,6 @@ export default function App() {
 
   useEffect(() => {
     const r = new Renderer(canvasRef.current!);
-    void connectMidi();
     const off = installComputerKeyboard();
     const key = (e: KeyboardEvent) => {
       if (e.code === "Space" && (e.target as HTMLElement).tagName !== "BUTTON") {
@@ -23,13 +22,17 @@ export default function App() {
         useEngine.setState((s) => ({ playing: !s.playing }));
       }
     };
-    const unlock = () => synth.unlock();
+    const unlock = () => {
+      synth.unlock();
+      void connectMidi();
+    };
     window.addEventListener("keydown", key);
-    window.addEventListener("pointerdown", unlock, { once: true });
+    window.addEventListener("pointerdown", unlock);
     return () => {
       r.destroy();
       off();
       window.removeEventListener("keydown", key);
+      window.removeEventListener("pointerdown", unlock);
     };
   }, []);
 

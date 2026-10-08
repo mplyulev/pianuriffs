@@ -16,42 +16,70 @@ export const onNote = (fn: Listener) => {
 export const emitNote = (midi: number, velocity: number, time: number, on: boolean) =>
   listeners.forEach((l) => l({ midi, velocity, time }, on));
 
+export type MidiStatus = "idle" | "prompt" | "ready" | "denied" | "unsupported";
+
 interface MidiState {
   supported: boolean;
-  status: "idle" | "ready" | "denied";
+  status: MidiStatus;
   inputs: string[];
 }
 
 export const useMidi = create<MidiState>(() => ({
   supported: typeof navigator !== "undefined" && "requestMIDIAccess" in navigator,
-  status: "idle",
+  status: typeof navigator !== "undefined" && "requestMIDIAccess" in navigator ? "idle" : "unsupported",
   inputs: [],
 }));
 
-function handle(e: WebMidi.MIDIMessageEvent) {
-  const [s, d1, d2] = e.data;
+let access: MIDIAccess | null = null;
+let connecting: Promise<boolean> | null = null;
+
+function handle(e: Event) {
+  const data = (e as MIDIMessageEvent).data;
+  if (!data || data.length < 2) return;
+  const s = data[0];
+  const d1 = data[1];
+  const d2 = data.length > 2 ? data[2] : 0;
   const cmd = s & 0xf0;
-  if (cmd === 0x90 && d2 > 0) emitNote(d1, d2 / 127, e.timeStamp, true);
-  else if (cmd === 0x80 || (cmd === 0x90 && d2 === 0)) emitNote(d1, 0, e.timeStamp, false);
+  const time = (e as MIDIMessageEvent).timeStamp || performance.now();
+  if (cmd === 0x90 && d2 > 0) emitNote(d1, d2 / 127, time, true);
+  else if (cmd === 0x80 || (cmd === 0x90 && d2 === 0)) emitNote(d1, 0, time, false);
 }
 
-export async function connectMidi() {
-  if (!useMidi.getState().supported) return;
-  try {
-    const access = await navigator.requestMIDIAccess();
-    const refresh = () => {
-      const names: string[] = [];
-      access.inputs.forEach((input) => {
-        names.push(input.name ?? "MIDI device");
-        input.onmidimessage = handle;
-      });
-      useMidi.setState({ status: "ready", inputs: names });
-    };
-    access.onstatechange = refresh;
-    refresh();
-  } catch {
-    useMidi.setState({ status: "denied" });
+function bindInputs(midi: MIDIAccess) {
+  const names: string[] = [];
+  midi.inputs.forEach((input) => {
+    names.push(input.name || input.manufacturer || "MIDI keyboard");
+    input.onmidimessage = handle;
+  });
+  useMidi.setState({ status: "ready", inputs: names });
+}
+
+export async function connectMidi(): Promise<boolean> {
+  if (!useMidi.getState().supported) {
+    useMidi.setState({ status: "unsupported" });
+    return false;
   }
+  if (access) {
+    bindInputs(access);
+    return true;
+  }
+  if (connecting) return connecting;
+  useMidi.setState({ status: "prompt" });
+  connecting = (async () => {
+    try {
+      const midi = await navigator.requestMIDIAccess({ sysex: false });
+      access = midi;
+      midi.onstatechange = () => bindInputs(midi);
+      bindInputs(midi);
+      return true;
+    } catch {
+      useMidi.setState({ status: "denied", inputs: [] });
+      return false;
+    } finally {
+      connecting = null;
+    }
+  })();
+  return connecting;
 }
 
 const KEYMAP: Record<string, number> = {
