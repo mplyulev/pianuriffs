@@ -2,9 +2,9 @@ import type { Song } from "../song";
 import { LH, Part, RH, makeSong, tone, voicing, type ChordType, type Pattern } from "./dsl";
 import { bassLine, hits, riff } from "./genres";
 
-type Prog = [off: number, type: ChordType, bars?: number][];
+export type Prog = [off: number, type: ChordType, bars?: number][];
 
-interface Spec {
+export interface Spec {
   label: string;
   title: string;
   bpm: number;
@@ -17,14 +17,14 @@ interface Spec {
   loops?: number;
 }
 
-function build(o: Spec): () => Song {
+export function build(o: Spec): () => Song {
   return () => {
     const bpb = o.bpb ?? 4;
     const R = new Part("R");
     const L = new Part("L");
     for (let loop = 0; loop < (o.loops ?? 2); loop++) {
       o.prog.forEach(([off, type, bars = 1], ci) => {
-        const v = voicing(o.key + off, type);
+        const v = voicing(o.key + off, type, o.key);
         for (let b = 0; b < bars; b++) {
           const last = ci === o.prog.length - 1 && b === bars - 1;
           (last && o.fill ? o.fill : o.rh)(R, v, bpb);

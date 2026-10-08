@@ -11,7 +11,28 @@ export const IVS = {
   dim: [0, 3, 6],
   m7b5: [0, 3, 6, 10],
   "5": [0, 7],
+  "9": [0, 4, 7, 10, 14],
+  m9: [0, 3, 7, 10, 14],
+  M9: [0, 4, 7, 11, 14],
+  "13": [0, 4, 7, 10, 14, 21],
+  m11: [0, 3, 7, 10, 14, 17],
+  "7#9": [0, 4, 7, 10, 15],
+  "6": [0, 4, 7, 9],
+  m6: [0, 3, 7, 9],
+  add9: [0, 4, 7, 14],
+  "7sus": [0, 5, 7, 10],
+  dim7: [0, 3, 6, 9],
 } as const;
+
+/** Right-hand comping shapes (semitones above the root) for extended chords: rootless, compact. */
+const SHAPES: Partial<Record<ChordType, number[]>> = {
+  "9": [4, 7, 10, 14],
+  m9: [3, 7, 10, 14],
+  M9: [4, 7, 11, 14],
+  "13": [4, 9, 10, 14],
+  m11: [3, 10, 14, 17],
+  "7#9": [4, 10, 15],
+};
 export type ChordType = keyof typeof IVS;
 
 export const tone = (root: number, ivs: readonly number[], i: number) =>
@@ -59,16 +80,21 @@ export function makeSong(title: string, composer: string, bpm: number, bpb: numb
 }
 
 export interface Voicing {
+  tonic: number;
   root: number;
+  shell: number[];
   rh: number[];
   bass: number;
   ivs: readonly number[];
 }
 
-export function voicing(pc: number, type: ChordType): Voicing {
-  const ivs = IVS[type];
+export function voicing(pc: number, type: ChordType, key = 0): Voicing {
+  const ivs: readonly number[] = IVS[type];
   const root = 60 + wrap(pc);
-  return { root, rh: ivs.map((i) => root + i), bass: 48 + wrap(pc), ivs };
+  const bass = 48 + wrap(pc);
+  const rh = (SHAPES[type] ?? [...ivs]).map((i: number) => root + i);
+  const shell = [bass + ivs[1], bass + (ivs.length > 3 && ivs[3] < 12 ? ivs[3] : 7)];
+  return { tonic: 60 + wrap(key), root, rh, shell, bass, ivs };
 }
 
 export type Pattern = (p: Part, v: Voicing, bpb: number) => void;
@@ -95,7 +121,7 @@ export function progression(o: {
   const L = new Part("L");
   for (let loop = 0; loop < (o.loops ?? 2); loop++) {
     for (const c of o.prog) {
-      const v = voicing((o.key ?? 0) + c.off, c.type);
+      const v = voicing((o.key ?? 0) + c.off, c.type, o.key ?? 0);
       for (let b = 0; b < (c.bars ?? 1); b++) {
         o.rh(R, v, bpb);
         o.lh(L, v, bpb);

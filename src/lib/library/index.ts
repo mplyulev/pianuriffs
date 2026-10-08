@@ -1,7 +1,7 @@
 import type { Song } from "../song";
 import { CLASSICAL } from "./classical";
-import { BLUES, JAZZ, POP } from "./styles";
-import { FUNK, HIPHOP, LOFI, RNB, ROCK } from "./genres";
+import { JAZZ } from "./styles";
+import { BLUES, FUNK, HIPHOP, LOFI, POP, RNB, ROCK } from "./grooves";
 import { COUNTRY, GOSPEL, LATIN, RAGTIME, REGGAE, SYNTH } from "./world";
 import { CHORDS, LEFT_HAND, SCALES } from "./practice";
 
