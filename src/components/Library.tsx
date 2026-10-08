@@ -34,7 +34,9 @@ export function Library() {
         <div className="flex items-center justify-between px-5 pb-3 pt-5">
           <div>
             <div className="text-lg font-bold tracking-tight">Library</div>
-            <div className="text-xs text-white/45">{CATEGORIES.length} categories · {CATEGORIES.length * 10} pieces</div>
+            <div className="text-xs text-white/45">
+              {CATEGORIES.length} categories · {CATEGORIES.reduce((n, c) => n + c.items.length, 0)} pieces
+            </div>
           </div>
           <button onClick={() => setLibraryOpen(false)} className="grid h-8 w-8 place-items-center rounded-full bg-white/8 text-white/70 hover:bg-white/15" title="Close (Esc)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>

@@ -48,6 +48,11 @@ export function parsePhrase(src: string): Note[][] {
   );
 }
 
+/** One-bar melody relative to the song tonic. Does not cycle. */
+export function line(src: string, oct = 12): Pattern {
+  return place((v) => v.tonic, oct)(parsePhrase(src)[0]);
+}
+
 /** A melody that cycles bar by bar, relative to the song's tonic (default one octave up). */
 export function phrase(src: string, oct = 12): Pattern {
   const bars = parsePhrase(src).map((n) => place((v) => v.tonic, oct)(n));
