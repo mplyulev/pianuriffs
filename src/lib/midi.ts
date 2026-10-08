@@ -40,7 +40,6 @@ export const useMidi = create<MidiState>(() => ({
 
 type Access = Awaited<ReturnType<Navigator["requestMIDIAccess"]>>;
 let access: Access | null = null;
-let connecting = false;
 
 function handle(e: Event) {
   const data = (e as MIDIMessageEvent).data;
@@ -79,39 +78,42 @@ async function bindInputs(midi: Access) {
   });
 }
 
-export async function connectMidi(): Promise<boolean> {
-  if (!useMidi.getState().supported) {
-    useMidi.setState({ status: "unsupported", detail: "This browser has no Web MIDI. Use Chrome or Edge." });
-    return false;
+/** Call this first thing in a click/pointerdown handler. Do not await anything before it. */
+export function connectMidi(): Promise<boolean> {
+  if (!navigator.requestMIDIAccess) {
+    useMidi.setState({
+      status: "unsupported",
+      detail: "This browser has no Web MIDI. Use Chrome or Edge on http://127.0.0.1:3000",
+    });
+    return Promise.resolve(false);
   }
-  if (connecting) return false;
-  connecting = true;
-  useMidi.setState({ status: "prompt", detail: "Waiting for the browser MIDI prompt…" });
-  try {
-    const midi = access ?? (await navigator.requestMIDIAccess({ sysex: false }));
-    access = midi;
-    midi.onstatechange = () => {
-      void bindInputs(midi);
-    };
-    await bindInputs(midi);
-    return true;
-  } catch (err) {
-    const name = err instanceof DOMException ? err.name : "";
-    const message = err instanceof Error ? err.message : "MIDI permission was blocked";
-    const framedNow = window.parent !== window;
-    const hint = framedNow
-      ? "MIDI cannot run inside the preview. Open http://127.0.0.1:3000 in Chrome or Edge."
-      : name === "NotAllowedError"
-        ? "The prompt was dismissed. Click Connect MIDI again and press Allow."
-        : name === "SecurityError"
-          ? "Chrome blocked MIDI for this page. Lock icon → Site settings → MIDI → Allow, then click Connect MIDI."
+  const pending = access ? Promise.resolve(access) : navigator.requestMIDIAccess();
+  useMidi.setState({
+    status: "prompt",
+    detail: "Look at the top of Chrome, under the URL, next to the lock — Allow is there, not in Windows.",
+  });
+  return pending
+    .then(async (midi) => {
+      access = midi;
+      midi.onstatechange = () => {
+        void bindInputs(midi);
+      };
+      await bindInputs(midi);
+      return true;
+    })
+    .catch((err: unknown) => {
+      const name = err instanceof DOMException ? err.name : "";
+      const message = err instanceof Error ? err.message : "MIDI permission was blocked";
+      const framedNow = window.parent !== window;
+      const hint = framedNow
+        ? "Open http://127.0.0.1:3000 in a normal Chrome window, not the Cursor preview."
+        : name === "SecurityError" || name === "NotAllowedError"
+          ? "Chrome hid the popup. Click the lock beside the URL → Site settings → MIDI devices → Allow."
           : message;
-    access = null;
-    useMidi.setState({ status: "denied", inputs: [], detail: hint, framed: framedNow });
-    return false;
-  } finally {
-    connecting = false;
-  }
+      access = null;
+      useMidi.setState({ status: "denied", inputs: [], detail: `${name || "Error"}: ${hint}`, framed: framedNow });
+      return false;
+    });
 }
 
 const KEYMAP: Record<string, number> = {

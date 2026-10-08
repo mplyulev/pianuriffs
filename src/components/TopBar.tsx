@@ -57,10 +57,10 @@ export function TopBar() {
         {error && <span className="text-xs text-rose-300">{error}</span>}
         <button
           type="button"
-          onClick={(e) => {
+          onPointerDown={(e) => {
             e.stopPropagation();
-            synth.unlock();
             void connectMidi();
+            synth.unlock();
           }}
           className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium transition ${
             connected ? "bg-emerald-400/15 text-emerald-200" : "bg-indigo-500/80 text-white hover:bg-indigo-400"
