@@ -1,6 +1,7 @@
 import type { Song } from "../song";
 import { CLASSICAL } from "./classical";
 import { BLUES, JAZZ, POP } from "./styles";
+import { FUNK, HIPHOP, LOFI, RNB, ROCK } from "./genres";
 import { CHORDS, LEFT_HAND, SCALES } from "./practice";
 
 export interface Category {
@@ -15,6 +16,11 @@ export interface Category {
 export const CATEGORIES: Category[] = [
   { id: "classical", name: "Songs & Classics", blurb: "Public-domain favourites", accent: "from-cyan-400 to-indigo-500", hands: { L: false, R: true }, items: CLASSICAL },
   { id: "pop", name: "Pop Progressions", blurb: "Loops you hear everywhere", accent: "from-pink-400 to-rose-500", hands: { L: true, R: true }, items: POP },
+  { id: "lofi", name: "Lo-Fi", blurb: "Mellow jazzy loops to study to", accent: "from-orange-200 to-rose-400", hands: { L: false, R: true }, items: LOFI },
+  { id: "rnb", name: "R&B / Soul", blurb: "Smooth grooves and slow jams", accent: "from-fuchsia-300 to-purple-500", hands: { L: false, R: true }, items: RNB },
+  { id: "hiphop", name: "Hip-Hop", blurb: "Boom bap, trap and sample loops", accent: "from-yellow-300 to-amber-500", hands: { L: false, R: true }, items: HIPHOP },
+  { id: "rock", name: "Rock", blurb: "Power chords and riffs", accent: "from-red-400 to-orange-500", hands: { L: false, R: true }, items: ROCK },
+  { id: "funk", name: "Funk", blurb: "Tight, syncopated pockets", accent: "from-teal-300 to-cyan-500", hands: { L: false, R: true }, items: FUNK },
   { id: "blues", name: "Blues Licks", blurb: "12-bar grooves with licks", accent: "from-amber-300 to-orange-500", hands: { L: false, R: true }, items: BLUES },
   { id: "jazz", name: "Jazz Licks", blurb: "ii–V–I lines and comping", accent: "from-violet-400 to-fuchsia-500", hands: { L: false, R: true }, items: JAZZ },
   { id: "chords", name: "Chords & Arpeggios", blurb: "Voicings under your fingers", accent: "from-emerald-300 to-teal-500", hands: { L: false, R: true }, items: CHORDS },

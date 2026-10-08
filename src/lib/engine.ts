@@ -29,7 +29,7 @@ const freshStats = { hits: 0, misses: 0, wrongs: 0, streak: 0, best: 0, finished
 
 export const useEngine = create<EngineState>(() => ({
   song: DEMO_SONG,
-  mode: "wait",
+  mode: "play",
   hands: { L: false, R: true },
   speed: 0.8,
   metronome: false,

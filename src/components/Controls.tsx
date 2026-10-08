@@ -53,7 +53,7 @@ function Progress() {
 export function Controls() {
   const s = useEngine();
   const set = useEngine.setState;
-  const modes: [Mode, string][] = [["listen", "Listen"], ["wait", "Wait"], ["play", "Play along"]];
+  const modes: [Mode, string][] = [["listen", "Listen"], ["wait", "Learn (waits)"], ["play", "Play along"]];
   const barBeats = s.song.beatsPerBar;
   const [hover, setHover] = useState(false);
   const [minimized, setMinimized] = useState(false);
@@ -131,6 +131,34 @@ export function Controls() {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /></svg>
           </button>
         </div>
+
+        <button
+          onClick={() => {
+            synth.unlock();
+            if (s.playing) {
+              set({ playing: false });
+              engine.restart();
+            } else {
+              setHover(false);
+              set({ mode: "play" });
+              engine.restart();
+              set({ playing: true });
+            }
+          }}
+          className={`flex h-10 items-center gap-2 rounded-xl px-4 text-sm font-bold text-white shadow-lg transition active:scale-95 ${
+            s.playing && s.mode === "play"
+              ? "bg-gradient-to-r from-rose-500 to-red-600 shadow-rose-500/30"
+              : "bg-gradient-to-r from-emerald-400 to-teal-500 shadow-emerald-500/30"
+          }`}
+          title="Play through the song at tempo; Stop resets to the start"
+        >
+          {s.playing ? (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2" /></svg>
+          ) : (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5z" /></svg>
+          )}
+          {s.playing ? "Stop" : "Play along"}
+        </button>
 
         <Group label="Mode">
           {modes.map(([m, l]) => (

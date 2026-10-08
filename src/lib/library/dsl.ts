@@ -10,6 +10,7 @@ export const IVS = {
   sus2: [0, 2, 7],
   dim: [0, 3, 6],
   m7b5: [0, 3, 6, 10],
+  "5": [0, 7],
 } as const;
 export type ChordType = keyof typeof IVS;
 
