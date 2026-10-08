@@ -6,7 +6,7 @@ Browser-based piano practice with a MIDI keyboard: falling notes, wait / play-al
 
 ```bash
 npm install
-npm run dev      # http://127.0.0.1:47213
+npm run dev      # http://127.0.0.1:3000
 npm run build    # static output in dist/
 ```
 
