@@ -2,10 +2,10 @@ import type { Song } from "../song";
 import { LH, Part, RH, progression, type ChordType, type Pattern } from "./dsl";
 
 type Spot = [start: number, dur: number];
-type Note = [start: number, dur: number, semis: number];
+export type Note = [start: number, dur: number, semis: number | number[]];
 type Prog = [off: number, type: ChordType, bars?: number][];
 
-const hits = (spots: Spot[]): Pattern => (p, v, bpb) => {
+export const hits = (spots: Spot[]): Pattern => (p, v, bpb) => {
   const t0 = p.t;
   for (const [s, d] of spots) {
     p.t = t0 + s;
@@ -18,13 +18,13 @@ const place = (base: (v: { root: number; bass: number }) => number): ((n: Note[]
   const t0 = p.t;
   for (const [s, d, semis] of notes) {
     p.t = t0 + s;
-    p.add(base(v) + semis, d, 0.9);
+    p.add(Array.isArray(semis) ? semis.map((x) => base(v) + x) : base(v) + semis, d, 0.9);
   }
   p.t = t0 + bpb;
 };
 
-const bassLine = place((v) => v.bass);
-const riff = place((v) => v.root);
+export const bassLine = place((v) => v.bass);
+export const riff = place((v) => v.root);
 
 function mk(label: string, title: string, bpm: number, key: number, prog: Prog, rh: Pattern, lh: Pattern): () => Song {
   return () =>

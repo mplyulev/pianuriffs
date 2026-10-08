@@ -2,7 +2,7 @@ import { accuracy, engine, useEngine } from "../lib/engine";
 
 export function Results() {
   const s = useEngine();
-  if (!s.finished || s.mode === "listen") return null;
+  if (!s.finished) return null;
   const acc = accuracy(s) ?? 0;
   return (
     <div className="absolute inset-0 grid place-items-center bg-black/55 backdrop-blur-sm">

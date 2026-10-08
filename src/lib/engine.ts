@@ -3,7 +3,7 @@ import { DEMO_SONG, type Hand, type Song } from "./song";
 import { synth } from "./audio";
 import { onNote, type NoteEvent } from "./midi";
 
-export type Mode = "listen" | "wait" | "play";
+export type Mode = "wait" | "play";
 
 export const HIT_WINDOW_SEC = 0.2;
 export const PERFECT_WINDOW_SEC = 0.07;
@@ -14,6 +14,7 @@ export interface EngineState {
   hands: Record<Hand, boolean>;
   speed: number;
   metronome: boolean;
+  appSound: boolean;
   countIn: boolean;
   loop: { a: number; b: number } | null;
   playing: boolean;
@@ -33,6 +34,7 @@ export const useEngine = create<EngineState>(() => ({
   hands: { L: false, R: true },
   speed: 0.8,
   metronome: false,
+  appSound: true,
   countIn: true,
   loop: null,
   playing: false,
@@ -103,7 +105,7 @@ class Engine {
 
   isRequired(i: number) {
     const s = this.s;
-    return s.mode !== "listen" && s.hands[s.song.notes[i].hand];
+    return s.hands[s.song.notes[i].hand];
   }
 
   private get beatsPerSec() {
@@ -138,7 +140,7 @@ class Engine {
   private onPlay() {
     const s = this.s;
     if (this.stats.finished || this.pos >= s.song.length) this.restart();
-    if (s.countIn && s.mode !== "listen" && this.pos <= (s.loop?.a ?? 0) + 1e-6) {
+    if (s.countIn && this.pos <= (s.loop?.a ?? 0) + 1e-6) {
       this.pos = (s.loop?.a ?? 0) - s.song.beatsPerBar;
     }
     this.audioIdx = lowerBound(s.song, this.pos - 1e-6);
@@ -162,7 +164,7 @@ class Engine {
     this.held.add(e.midi);
     synth.noteOn(e.midi, 0.4 + e.velocity * 0.6);
     const s = this.s;
-    if (!s.playing || s.mode === "listen") return;
+    if (!s.playing) return;
 
     const { notes } = s.song;
     const bps = this.beatsPerSec;
@@ -279,7 +281,7 @@ class Engine {
     while (this.audioIdx < notes.length && notes[this.audioIdx].start <= next) {
       const n = notes[this.audioIdx++];
       const idx = this.audioIdx - 1;
-      if (!this.isRequired(idx)) synth.noteOn(n.midi, 0.55, n.dur / bps);
+      if (s.appSound && !this.isRequired(idx)) synth.noteOn(n.midi, 0.55, n.dur / bps);
     }
 
     if (next >= s.song.length + 0.5) {

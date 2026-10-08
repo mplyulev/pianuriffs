@@ -2,6 +2,7 @@ import type { Song } from "../song";
 import { CLASSICAL } from "./classical";
 import { BLUES, JAZZ, POP } from "./styles";
 import { FUNK, HIPHOP, LOFI, RNB, ROCK } from "./genres";
+import { COUNTRY, GOSPEL, LATIN, RAGTIME, REGGAE, SYNTH } from "./world";
 import { CHORDS, LEFT_HAND, SCALES } from "./practice";
 
 export interface Category {
@@ -21,6 +22,12 @@ export const CATEGORIES: Category[] = [
   { id: "hiphop", name: "Hip-Hop", blurb: "Boom bap, trap and sample loops", accent: "from-yellow-300 to-amber-500", hands: { L: false, R: true }, items: HIPHOP },
   { id: "rock", name: "Rock", blurb: "Power chords and riffs", accent: "from-red-400 to-orange-500", hands: { L: false, R: true }, items: ROCK },
   { id: "funk", name: "Funk", blurb: "Tight, syncopated pockets", accent: "from-teal-300 to-cyan-500", hands: { L: false, R: true }, items: FUNK },
+  { id: "reggae", name: "Reggae", blurb: "Skank, one-drop and dub", accent: "from-green-300 to-yellow-400", hands: { L: false, R: true }, items: REGGAE },
+  { id: "country", name: "Country", blurb: "Boom-chick, steel slips, two-steps", accent: "from-amber-200 to-orange-400", hands: { L: false, R: true }, items: COUNTRY },
+  { id: "ragtime", name: "Ragtime", blurb: "Syncopated stride", accent: "from-stone-200 to-amber-500", hands: { L: false, R: true }, items: RAGTIME },
+  { id: "latin", name: "Latin", blurb: "Montuno, bossa, samba, mambo", accent: "from-rose-300 to-orange-500", hands: { L: false, R: true }, items: LATIN },
+  { id: "gospel", name: "Gospel", blurb: "Walk-ups, shouts and amens", accent: "from-indigo-300 to-violet-500", hands: { L: false, R: true }, items: GOSPEL },
+  { id: "synth", name: "Synth / EDM", blurb: "Arps, plucks and driving bass", accent: "from-cyan-300 to-fuchsia-500", hands: { L: false, R: true }, items: SYNTH },
   { id: "blues", name: "Blues Licks", blurb: "12-bar grooves with licks", accent: "from-amber-300 to-orange-500", hands: { L: false, R: true }, items: BLUES },
   { id: "jazz", name: "Jazz Licks", blurb: "ii–V–I lines and comping", accent: "from-violet-400 to-fuchsia-500", hands: { L: false, R: true }, items: JAZZ },
   { id: "chords", name: "Chords & Arpeggios", blurb: "Voicings under your fingers", accent: "from-emerald-300 to-teal-500", hands: { L: false, R: true }, items: CHORDS },

@@ -2,8 +2,6 @@ import { accuracy, useEngine } from "../lib/engine";
 
 export function Stats() {
   const s = useEngine();
-  const mode = s.mode;
-  if (mode === "listen") return null;
   const acc = accuracy(s);
   const items = [
     { label: "Accuracy", value: acc === null ? "—" : `${acc}%` },
