@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { useMidi, useKeyboardOctave } from "../lib/midi";
 import { useEngine } from "../lib/engine";
 import { DEMO_SONG, parseMidiFile } from "../lib/song";
+import { setLibraryOpen } from "../lib/ui";
 
 export function TopBar() {
   const midi = useMidi();
@@ -56,6 +57,12 @@ export function TopBar() {
           {label}
           {!connected && <span className="text-white/30">· oct {octave}</span>}
         </div>
+        <button
+          onClick={() => setLibraryOpen(true)}
+          className="rounded-lg bg-gradient-to-r from-cyan-400/90 to-indigo-500/90 px-3.5 py-1.5 text-xs font-bold text-white shadow-md shadow-indigo-500/25 transition hover:brightness-110"
+        >
+          Library
+        </button>
         <input ref={fileRef} type="file" accept=".mid,.midi" hidden onChange={(e) => load(e.target.files?.[0])} />
         <button
           onClick={() => fileRef.current?.click()}

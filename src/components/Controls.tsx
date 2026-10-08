@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { engine, useEngine, type Mode } from "../lib/engine";
 import { synth } from "../lib/audio";
 import { Group, Pill } from "./ui";
@@ -26,7 +26,7 @@ function Progress() {
   }, [song]);
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-3 pr-6">
       <span ref={label} className="w-24 text-xs font-medium tabular-nums text-white/50" />
       <div
         className="group relative h-6 flex-1 cursor-pointer"
@@ -55,6 +55,9 @@ export function Controls() {
   const set = useEngine.setState;
   const modes: [Mode, string][] = [["listen", "Listen"], ["wait", "Wait"], ["play", "Play along"]];
   const barBeats = s.song.beatsPerBar;
+  const [hover, setHover] = useState(false);
+  const [minimized, setMinimized] = useState(false);
+  const collapsed = !hover && (s.playing || minimized);
 
   const toggleHand = (h: "L" | "R") => {
     const next = { ...s.hands, [h]: !s.hands[h] };
@@ -74,13 +77,38 @@ export function Controls() {
   };
 
   return (
-    <div className="glass pointer-events-auto mx-auto flex max-w-5xl flex-col gap-3 rounded-2xl p-4">
+    <div
+      className="pointer-events-none absolute inset-x-0 bottom-[var(--keyh,150px)] flex justify-center px-3 pb-3 sm:px-4"
+    >
+      <div
+        className="pointer-events-auto w-full max-w-5xl"
+        onMouseEnter={() => setHover(true)}
+        onMouseLeave={() => setHover(false)}
+      >
+        <div
+          className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out ${
+            collapsed ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100"
+          }`}
+        >
+          <div className="overflow-hidden">
+            <div className="glass relative flex flex-col gap-3 rounded-2xl p-4">
+      <button
+        onClick={() => {
+          setMinimized(true);
+          setHover(false);
+        }}
+        className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full text-white/40 transition hover:bg-white/12 hover:text-white"
+        title="Minimize"
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+      </button>
       <Progress />
       <div className="flex flex-wrap items-end justify-between gap-x-5 gap-y-3">
         <div className="flex items-center gap-2">
           <button
             onClick={() => {
               synth.unlock();
+              if (!s.playing) setHover(false);
               set({ playing: !s.playing });
             }}
             className="grid h-12 w-12 place-items-center rounded-full bg-gradient-to-br from-cyan-400 to-indigo-500 text-white shadow-lg shadow-indigo-500/40 transition hover:scale-105 active:scale-95"
@@ -141,6 +169,22 @@ export function Controls() {
             {s.loop ? "Clear" : "Off"}
           </Pill>
         </Group>
+      </div>
+            </div>
+          </div>
+        </div>
+        {collapsed && (
+          <button
+            onClick={() => {
+              setMinimized(false);
+              setHover(true);
+            }}
+            className="mx-auto flex h-7 items-center gap-2 rounded-full border border-white/10 bg-black/45 px-4 text-[11px] font-semibold text-white/60 backdrop-blur transition hover:text-white"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M6 15l6-6 6 6" /></svg>
+            Controls
+          </button>
+        )}
       </div>
     </div>
   );

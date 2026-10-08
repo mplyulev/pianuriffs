@@ -7,6 +7,7 @@ import { TopBar } from "./components/TopBar";
 import { Controls } from "./components/Controls";
 import { Stats } from "./components/Stats";
 import { Results } from "./components/Results";
+import { Library } from "./components/Library";
 
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -42,11 +43,10 @@ export default function App() {
             <Stats />
           </div>
         </div>
-        <div className="pb-[min(22vh,200px)]">
-          <Controls />
-        </div>
       </div>
+      <Controls />
       <Results />
+      <Library />
     </div>
   );
 }

@@ -100,6 +100,7 @@ export class Renderer {
     for (let m = this.lo; m <= this.hi; m++) if (!isBlack(m)) whites++;
     const ww = this.w / whites;
     this.keyH = Math.max(90, Math.min(190, this.h * 0.2));
+    this.canvas.parentElement?.style.setProperty("--keyh", `${this.keyH}px`);
     let wi = 0;
     for (let m = this.lo; m <= this.hi; m++) {
       if (isBlack(m)) {
