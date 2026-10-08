@@ -1,6 +1,5 @@
 import { useRef, useState } from "react";
-import { connectMidi, useMidi, useKeyboardOctave } from "../lib/midi";
-import { synth } from "../lib/audio";
+import { useMidi, useKeyboardOctave } from "../lib/midi";
 import { useEngine } from "../lib/engine";
 import { DEMO_SONG, parseMidiFile } from "../lib/song";
 import { setLibraryOpen } from "../lib/ui";
@@ -26,18 +25,12 @@ export function TopBar() {
 
   const connected = midi.inputs.length > 0;
   const label = connected
-    ? midi.lastNote !== null
-      ? `${midi.inputs[0]} · note ${midi.lastNote}`
-      : midi.inputs[0]
-    : midi.status === "unsupported"
+    ? midi.inputs[0]
+    : !midi.supported
       ? "No Web MIDI — use computer keys"
       : midi.status === "denied"
-        ? "MIDI blocked — click Connect MIDI"
-        : midi.status === "prompt"
-          ? "Use the browser Allow button"
-          : midi.status === "ready"
-            ? "MIDI on — plug in a keyboard"
-            : "Connect MIDI";
+        ? "MIDI access denied"
+        : "No keyboard detected";
 
   return (
     <header className="glass pointer-events-auto flex flex-wrap items-center justify-between gap-3 rounded-2xl px-4 py-2.5">
@@ -55,25 +48,16 @@ export function TopBar() {
 
       <div className="flex flex-wrap items-center gap-2">
         {error && <span className="text-xs text-rose-300">{error}</span>}
-        <button
-          type="button"
-          onPointerDown={(e) => {
-            e.stopPropagation();
-            void connectMidi();
-            synth.unlock();
-          }}
-          className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium transition ${
-            connected ? "bg-emerald-400/15 text-emerald-200" : "bg-indigo-500/80 text-white hover:bg-indigo-400"
+        <div
+          className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium ${
+            connected ? "bg-emerald-400/15 text-emerald-200" : "bg-white/6 text-white/50"
           }`}
-          title="Click once, then press Allow in the Chrome dialog. Computer keys: A S D F G H J K L ;  black: W E T Y U O P. Z/X change octave."
+          title="Computer keys: A–; (white/black via W E T Y U O P). Z/X shift octave."
         >
-          <span className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-400 shadow-[0_0_8px_#34d399]" : "bg-white/70"}`} />
-          {connected ? label : midi.status === "prompt" ? "Waiting for Allow…" : "Connect MIDI"}
-          <span className="text-white/40">· keys C{octave}</span>
-        </button>
-        {(midi.detail || midi.status === "denied") && (
-          <span className="max-w-[24rem] text-[11px] leading-snug text-white/55">{midi.detail}</span>
-        )}
+          <span className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-400 shadow-[0_0_8px_#34d399]" : "bg-white/30"}`} />
+          {label}
+          {!connected && <span className="text-white/30">· oct {octave}</span>}
+        </div>
         <SoundPanel />
         <button
           onClick={() => setLibraryOpen(true)}
