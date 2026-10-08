@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PATCHES, synth, useSound } from "../lib/audio";
 
 const NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
@@ -9,6 +9,8 @@ const select =
 
 export function SoundPanel() {
   const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+  const leaveTimer = useRef(0);
   const s = useSound();
   const set = (patch: Partial<typeof s>) => {
     useSound.setState(patch);
@@ -16,10 +18,40 @@ export function SoundPanel() {
     setTimeout(() => synth.preview(), 0);
   };
 
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (!root.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("pointerdown", onDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const scheduleClose = () => {
+    window.clearTimeout(leaveTimer.current);
+    leaveTimer.current = window.setTimeout(() => {
+      const el = document.activeElement;
+      if (el && root.current?.contains(el) && el.tagName === "SELECT") return;
+      setOpen(false);
+    }, 220);
+  };
+
   return (
-    <div className="relative">
+    <div
+      ref={root}
+      className="relative"
+      onMouseEnter={() => window.clearTimeout(leaveTimer.current)}
+      onMouseLeave={scheduleClose}
+    >
       <button
-        onClick={() => setOpen(!open)}
+        onClick={() => setOpen((v) => !v)}
         className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
           open ? "bg-white/18 text-white" : "bg-white/8 text-white/80 hover:bg-white/15"
         }`}
