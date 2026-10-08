@@ -7,6 +7,7 @@ export interface SongNote {
   start: number;
   dur: number;
   hand: Hand;
+  vel?: number;
 }
 
 export interface Song {

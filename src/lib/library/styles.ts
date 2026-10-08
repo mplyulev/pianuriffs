@@ -65,10 +65,10 @@ function iiVI(title: string, shift: number, lickIdx: number, bpm: number): Song 
   const R = new Part("R");
   const L = new Part("L");
   for (let loop = 0; loop < 2; loop++) {
-    JAZZ_LICKS[lickIdx].rh.forEach((bar) => R.text(bar, shift));
+    JAZZ_LICKS[(lickIdx + loop) % JAZZ_LICKS.length].rh.forEach((bar) => R.text(bar, shift));
     II_V_I_LH.forEach((c) => CHARLESTON(L, c.map((m) => m + shift)));
   }
-  return makeSong(title, `Jazz lick · ${JAZZ_LICKS[lickIdx].name}`, bpm, 4, [R, L]);
+  return makeSong(title, `Jazz lick · ${JAZZ_LICKS[lickIdx].name} → ${JAZZ_LICKS[(lickIdx + 1) % JAZZ_LICKS.length].name}`, bpm, 4, [R, L], 0.17);
 }
 
 function jazzLines(title: string, bars: { rh: string; lh: number[] }[], bpm: number, name: string): Song {
@@ -80,7 +80,7 @@ function jazzLines(title: string, bars: { rh: string; lh: number[] }[], bpm: num
       CHARLESTON(L, b.lh);
     }
   }
-  return makeSong(title, name, bpm, 4, [R, L]);
+  return makeSong(title, name, bpm, 4, [R, L], 0.17);
 }
 
 function bebopScale(): Song {
@@ -90,7 +90,7 @@ function bebopScale(): Song {
   const run = [...scale, ...[...scale].reverse().slice(1)];
   for (let i = 0; i < 32; i++) R.add(run[i % run.length], 0.5);
   for (let b = 0; b < 4; b++) CHARLESTON(L, [43, 53, 59]);
-  return makeSong("Bebop Dominant Scale (G7)", "Jazz lick · scale run", 112, 4, [R, L]);
+  return makeSong("Bebop Dominant Scale (G7)", "Jazz lick · scale run", 112, 4, [R, L], 0.17);
 }
 
 function rootless(): Song {
@@ -109,7 +109,7 @@ function rootless(): Song {
       L.add(c.l, 2, 0.95);
     }
   }
-  return makeSong("Rootless Voicing Comping", "Jazz lick · comping", 100, 4, [R, L]);
+  return makeSong("Rootless Voicing Comping", "Jazz lick · comping", 100, 4, [R, L], 0.17);
 }
 
 const bossaRh: Pattern = (p, v) => {

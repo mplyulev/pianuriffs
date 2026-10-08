@@ -281,7 +281,7 @@ class Engine {
     while (this.audioIdx < notes.length && notes[this.audioIdx].start <= next) {
       const n = notes[this.audioIdx++];
       const idx = this.audioIdx - 1;
-      if (s.appSound) synth.noteOn(n.midi, this.isRequired(idx) ? 0.3 : 0.6, n.dur / bps);
+      if (s.appSound) synth.noteOn(n.midi, (n.vel ?? 0.7) * (this.isRequired(idx) ? 0.4 : 0.85), n.dur / bps);
     }
 
     if (next >= s.song.length + 0.5) {

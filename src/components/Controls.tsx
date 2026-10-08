@@ -18,7 +18,7 @@ function Progress() {
       if (fill.current) fill.current.style.transform = `scaleX(${Math.min(1, p)})`;
       if (label.current) {
         const bar = Math.max(0, Math.floor(engine.pos / song.beatsPerBar)) + 1;
-        label.current.textContent = `Bar ${bar} / ${Math.ceil(song.length / song.beatsPerBar)}`;
+        label.current.textContent = `Bar ${bar} / ${Math.ceil(song.length / song.beatsPerBar - 0.08)}`;
       }
     };
     raf = requestAnimationFrame(loopFn);

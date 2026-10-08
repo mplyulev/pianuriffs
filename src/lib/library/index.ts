@@ -47,5 +47,5 @@ export function loadItem(cat: Category, index: number): Song {
 }
 
 export function barsOf(song: Song) {
-  return Math.ceil(song.length / song.beatsPerBar);
+  return Math.ceil(song.length / song.beatsPerBar - 0.08);
 }

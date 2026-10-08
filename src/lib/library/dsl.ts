@@ -48,10 +48,10 @@ export class Part {
   t = 0;
   constructor(readonly hand: Hand) {}
 
-  add(p: Pitch, dur: number, gate = 0.92) {
+  add(p: Pitch, dur: number, gate = 0.92, vel?: number) {
     if (p !== null) {
       for (const midi of Array.isArray(p) ? p : [p as number]) {
-        this.notes.push({ midi, start: this.t, dur: dur * gate, hand: this.hand });
+        this.notes.push({ midi, start: this.t, dur: dur * gate, hand: this.hand, vel });
       }
     }
     this.t += dur;
@@ -75,8 +75,23 @@ export class Part {
   }
 }
 
-export function makeSong(title: string, composer: string, bpm: number, bpb: number, parts: Part[]): Song {
-  return finalize({ title, composer, bpm, beatsPerBar: bpb, notes: parts.flatMap((p) => p.notes) });
+export function makeSong(title: string, composer: string, bpm: number, bpb: number, parts: Part[], swing = 0): Song {
+  const notes = parts.flatMap((p) => p.notes).map((n) =>
+    swing > 0 && Math.abs((n.start % 1) - 0.5) < 1e-6 ? { ...n, start: n.start + swing } : n,
+  );
+  return finalize({ title, composer, bpm, beatsPerBar: bpb, notes });
+}
+
+/** Run a pattern, then add copies of its notes shifted by `semis` (optionally filtered). */
+export function doubled(pattern: Pattern, semis: number, keep?: (midi: number, v: Voicing) => boolean): Pattern {
+  return (p, v, bpb) => {
+    const before = p.notes.length;
+    pattern(p, v, bpb);
+    const added = p.notes.slice(before);
+    for (const n of added) {
+      if (!keep || keep(n.midi, v)) p.notes.push({ ...n, midi: n.midi + semis, vel: (n.vel ?? 0.8) * 0.75 });
+    }
+  };
 }
 
 export interface Voicing {

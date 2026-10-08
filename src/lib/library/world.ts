@@ -1,6 +1,6 @@
 import type { Song } from "../song";
-import { LH, Part, RH, makeSong, tone, voicing, type ChordType, type Pattern } from "./dsl";
-import { bassLine, hits, riff } from "./genres";
+import { LH, Part, RH, doubled, makeSong, tone, voicing, type ChordType, type Pattern } from "./dsl";
+import { MELODIC, bassLine, hits, riff } from "./genres";
 
 export type Prog = [off: number, type: ChordType, bars?: number][];
 
@@ -13,6 +13,9 @@ export interface Spec {
   rh: Pattern;
   lh: Pattern;
   fill?: Pattern;
+  rh2?: Pattern;
+  lh2?: Pattern;
+  swing?: number;
   bpb?: number;
   loops?: number;
 }
@@ -22,17 +25,26 @@ export function build(o: Spec): () => Song {
     const bpb = o.bpb ?? 4;
     const R = new Part("R");
     const L = new Part("L");
-    for (let loop = 0; loop < (o.loops ?? 2); loop++) {
+    const loops = o.loops ?? 2;
+    const bassOnly = (m: number, v: { bass: number }) => [0, 7, 12].includes(m - v.bass);
+    const rh2 = o.rh2 ?? (MELODIC.has(o.rh) ? doubled(o.rh, 12) : o.rh);
+    const lh2 = o.lh2 ?? doubled(o.lh, -12, bassOnly);
+    for (let loop = 0; loop < loops; loop++) {
+      const rh = loop === 0 ? o.rh : rh2;
+      const lh = loop === 0 ? o.lh : lh2;
       o.prog.forEach(([off, type, bars = 1], ci) => {
         const v = voicing(o.key + off, type, o.key);
         for (let b = 0; b < bars; b++) {
           const last = ci === o.prog.length - 1 && b === bars - 1;
-          (last && o.fill ? o.fill : o.rh)(R, v, bpb);
-          o.lh(L, v, bpb);
+          (last && o.fill ? o.fill : rh)(R, v, bpb);
+          lh(L, v, bpb);
         }
       });
     }
-    return makeSong(o.title, o.label, o.bpm, bpb, [R, L]);
+    const home = voicing(o.key + o.prog[0][0], o.prog[0][1], o.key);
+    R.add(home.rh, bpb, 0.97, 0.9);
+    L.add([home.bass, home.bass - 12], bpb, 0.97, 0.8);
+    return makeSong(o.title, o.label, o.bpm, bpb, [R, L], o.swing ?? ({ Gospel: 0.1, Country: 0.06 } as Record<string, number>)[o.label] ?? 0);
   };
 }
 

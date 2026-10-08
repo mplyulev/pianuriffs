@@ -4,12 +4,12 @@ import { bassFrom, hitsFrom, layer, parsePhrase, phrase, riff, seq, shellFrom } 
 import { build, type Prog } from "./world";
 
 const make =
-  (label: string) =>
+  (label: string, swing = 0) =>
   (title: string, bpm: number, key: number, prog: Prog, rh: Pattern, lh: Pattern, loops = 2) =>
-    build({ label, title, bpm, key, prog, rh, lh, loops });
+    build({ label, title, bpm, key, prog, rh, lh, loops, swing });
 
 /* ====================== LO-FI ====================== */
-const lf = make("Lo-Fi");
+const lf = make("Lo-Fi", 0.14);
 const lfA = layer(bassFrom("0:1.75:0 2.5:.5:7 3.25:.75:0"), shellFrom("0.75:.75 2.75:.5"));
 const lfB = layer(bassFrom("0:1:0 1.5:.5:0 2:1.5:7"), shellFrom("1:.5 3:1"));
 const lfC = layer(bassFrom("0:2:0 2:2:7"), shellFrom("1:1 3:1"));
@@ -37,7 +37,7 @@ export const LOFI = [
 ];
 
 /* ====================== R&B / SOUL ====================== */
-const rb = make("R&B / Soul");
+const rb = make("R&B / Soul", 0.08);
 const rbA = layer(bassFrom("0:1.5:0 1.5:.5:7 2:1:0 3.5:.5:10"), shellFrom("1:.5 2.5:.5 3:.5"));
 const rbB = layer(bassFrom("0:2:0 2:1:7 3:1:5"), shellFrom("1:1"));
 const rbC = layer(bassFrom("0:1:0 1:.5:0 2.5:.5:0 3:1:7"), shellFrom("1.5:.5 3.5:.5"));
@@ -64,7 +64,7 @@ export const RNB = [
 ];
 
 /* ====================== HIP-HOP ====================== */
-const hh = make("Hip-Hop");
+const hh = make("Hip-Hop", 0.1);
 const hhBoom = layer(bassFrom("0:.75:0 1.5:.5:0 2.5:.5:0 3:1:-2"), shellFrom("2:.5"));
 const hhTrap = layer(bassFrom("0:2:0 2.5:.5:0 3:1:0"), shellFrom("1:.25 3.5:.25"));
 const hhSlide = bassFrom("0:1:0 1.5:.5:0 2:.5:-2 2.5:.5:0 3:1:3");
@@ -184,7 +184,7 @@ function blues(title: string, bpm: number, key: number, lh: keyof typeof BLUES_L
       const base = 60 + wrap(pc);
       riff(lick.map(([s, d, m]) => [s, d, minor && typeof m === "number" && m === 4 ? 3 : m] as typeof lick[number]))(R, { ...v, root: base }, 4);
     });
-    return makeSong(title, "Blues lick", bpm, 4, [R, L]);
+    return makeSong(title, "Blues lick", bpm, 4, [R, L], lh === "triplet" || lh === "rock" ? 0 : 0.167);
   };
 }
 
