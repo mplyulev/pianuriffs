@@ -8,6 +8,7 @@ import { Controls } from "./components/Controls";
 import { Stats } from "./components/Stats";
 import { Results } from "./components/Results";
 import { Library } from "./components/Library";
+import { MidiHelp } from "./components/MidiHelp";
 
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -39,6 +40,7 @@ export default function App() {
       <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-3 sm:p-4">
         <div className="flex flex-col gap-3">
           <TopBar />
+          <MidiHelp />
           <div className="flex justify-end">
             <Stats />
           </div>
