@@ -3,8 +3,7 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
 const midiHeaders = {
-  "Permissions-Policy": "midi=*, usb=*",
-  "Feature-Policy": "midi *",
+  "Permissions-Policy": "midi=(self)",
 };
 
 export default defineConfig({

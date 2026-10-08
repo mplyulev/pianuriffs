@@ -24,9 +24,10 @@ interface MidiState {
   inputs: string[];
   detail: string;
   framed: boolean;
+  lastNote: number | null;
 }
 
-const framed = typeof window !== "undefined" && window.top !== window.self;
+const framed = typeof window !== "undefined" && window.parent !== window;
 
 export const useMidi = create<MidiState>(() => ({
   supported: typeof navigator !== "undefined" && "requestMIDIAccess" in navigator,
@@ -34,11 +35,12 @@ export const useMidi = create<MidiState>(() => ({
   inputs: [],
   detail: "",
   framed,
+  lastNote: null,
 }));
 
 type Access = Awaited<ReturnType<Navigator["requestMIDIAccess"]>>;
 let access: Access | null = null;
-let connecting: Promise<boolean> | null = null;
+let connecting = false;
 
 function handle(e: Event) {
   const data = (e as MIDIMessageEvent).data;
@@ -48,60 +50,68 @@ function handle(e: Event) {
   const d2 = data.length > 2 ? data[2] : 0;
   const cmd = s & 0xf0;
   const time = (e as MIDIMessageEvent).timeStamp || performance.now();
-  if (cmd === 0x90 && d2 > 0) emitNote(d1, d2 / 127, time, true);
-  else if (cmd === 0x80 || (cmd === 0x90 && d2 === 0)) emitNote(d1, 0, time, false);
+  if (cmd === 0x90 && d2 > 0) {
+    emitNote(d1, d2 / 127, time, true);
+    useMidi.setState({ lastNote: d1 });
+  } else if (cmd === 0x80 || (cmd === 0x90 && d2 === 0)) {
+    emitNote(d1, 0, time, false);
+  }
 }
 
-function bindInputs(midi: Access) {
+async function bindInputs(midi: Access) {
   const names: string[] = [];
-  midi.inputs.forEach((input) => {
-    names.push(input.name || input.manufacturer || "MIDI keyboard");
+  for (const input of midi.inputs.values()) {
+    try {
+      await input.open();
+    } catch {
+      /* some ports refuse open() but still send */
+    }
     input.onmidimessage = handle;
+    input.addEventListener("midimessage", handle);
+    names.push(input.name || input.manufacturer || input.id || "MIDI keyboard");
+  }
+  useMidi.setState({
+    status: "ready",
+    inputs: names,
+    detail: names.length
+      ? `Listening on ${names.join(", ")}. Play a key.`
+      : "MIDI is allowed. Plug in the keyboard, then click Connect MIDI again.",
   });
-  useMidi.setState({ status: "ready", inputs: names });
 }
 
 export async function connectMidi(): Promise<boolean> {
   if (!useMidi.getState().supported) {
-    useMidi.setState({ status: "unsupported" });
+    useMidi.setState({ status: "unsupported", detail: "This browser has no Web MIDI. Use Chrome or Edge." });
     return false;
   }
-  if (access) {
-    bindInputs(access);
+  if (connecting) return false;
+  connecting = true;
+  useMidi.setState({ status: "prompt", detail: "Waiting for the browser MIDI prompt…" });
+  try {
+    const midi = access ?? (await navigator.requestMIDIAccess({ sysex: false }));
+    access = midi;
+    midi.onstatechange = () => {
+      void bindInputs(midi);
+    };
+    await bindInputs(midi);
     return true;
-  }
-  if (connecting) return connecting;
-  useMidi.setState({ status: "prompt" });
-  connecting = (async () => {
-    try {
-      let midi: Access;
-      try {
-        midi = await navigator.requestMIDIAccess({ sysex: false });
-      } catch {
-        midi = await navigator.requestMIDIAccess();
-      }
-      access = midi;
-      midi.onstatechange = () => bindInputs(midi);
-      bindInputs(midi);
-      return true;
-    } catch (err) {
-      const name = err instanceof DOMException ? err.name : "";
-      const message = err instanceof Error ? err.message : "MIDI permission was blocked";
-      const framedNow = window.top !== window.self;
-      const hint = framedNow
-        ? "MIDI cannot run inside the preview frame. Open http://127.0.0.1:3000 in a Chrome or Edge tab."
+  } catch (err) {
+    const name = err instanceof DOMException ? err.name : "";
+    const message = err instanceof Error ? err.message : "MIDI permission was blocked";
+    const framedNow = window.parent !== window;
+    const hint = framedNow
+      ? "MIDI cannot run inside the preview. Open http://127.0.0.1:3000 in Chrome or Edge."
+      : name === "NotAllowedError"
+        ? "The prompt was dismissed. Click Connect MIDI again and press Allow."
         : name === "SecurityError"
-          ? "This page is not allowed to use MIDI. Open http://127.0.0.1:3000 in Chrome, click the lock icon → Site settings → MIDI → Allow."
-          : name === "NotAllowedError"
-            ? "Click Allow on the MIDI prompt, or set the lock icon → MIDI → Allow, then retry."
-            : message;
-      useMidi.setState({ status: "denied", inputs: [], detail: hint, framed: framedNow });
-      return false;
-    } finally {
-      connecting = null;
-    }
-  })();
-  return connecting;
+          ? "Chrome blocked MIDI for this page. Lock icon → Site settings → MIDI → Allow, then click Connect MIDI."
+          : message;
+    access = null;
+    useMidi.setState({ status: "denied", inputs: [], detail: hint, framed: framedNow });
+    return false;
+  } finally {
+    connecting = false;
+  }
 }
 
 const KEYMAP: Record<string, number> = {

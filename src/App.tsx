@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Renderer } from "./lib/renderer";
-import { connectMidi, installComputerKeyboard } from "./lib/midi";
+import { installComputerKeyboard } from "./lib/midi";
 import { useEngine } from "./lib/engine";
 import { synth } from "./lib/audio";
 import { TopBar } from "./components/TopBar";
@@ -22,12 +22,9 @@ export default function App() {
         useEngine.setState((s) => ({ playing: !s.playing }));
       }
     };
-    const unlock = () => {
-      synth.unlock();
-      void connectMidi();
-    };
+    const unlock = () => synth.unlock();
     window.addEventListener("keydown", key);
-    window.addEventListener("pointerdown", unlock);
+    window.addEventListener("pointerdown", unlock, { once: true });
     return () => {
       r.destroy();
       off();
