@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { engine, useEngine, type Mode } from "../lib/engine";
 import { synth } from "../lib/audio";
 import { Group, Pill } from "./ui";
@@ -55,7 +55,13 @@ export function Controls() {
   const set = useEngine.setState;
   const modes: [Mode, string][] = [["play", "Play along"], ["wait", "Wait"]];
   const barBeats = s.song.beatsPerBar;
-  const [hover, setHover] = useState(false);
+  const [hover, setHoverState] = useState(false);
+  const closeTimer = useRef<number>(0);
+  const setHover = useCallback((on: boolean, delay = 0) => {
+    window.clearTimeout(closeTimer.current);
+    if (on || delay === 0) setHoverState(on);
+    else closeTimer.current = window.setTimeout(() => setHoverState(false), delay);
+  }, []);
   const [minimized, setMinimized] = useState(false);
   const collapsed = !hover && (s.playing || minimized);
 
@@ -81,9 +87,9 @@ export function Controls() {
       className="pointer-events-none absolute inset-x-0 bottom-[var(--keyh,150px)] flex justify-center px-3 pb-3 sm:px-4"
     >
       <div
-        className="pointer-events-auto w-full max-w-5xl"
+        className={`pointer-events-auto w-full max-w-5xl ${collapsed ? "" : "pt-7"}`}
         onMouseEnter={() => setHover(true)}
-        onMouseLeave={() => setHover(false)}
+        onMouseLeave={() => setHover(false, 350)}
       >
         <div
           className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out ${

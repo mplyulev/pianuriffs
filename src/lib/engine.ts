@@ -31,7 +31,7 @@ const freshStats = { hits: 0, misses: 0, wrongs: 0, streak: 0, best: 0, finished
 export const useEngine = create<EngineState>(() => ({
   song: DEMO_SONG,
   mode: "play",
-  hands: { L: false, R: true },
+  hands: { L: true, R: true },
   speed: 0.8,
   metronome: false,
   appSound: true,
@@ -281,7 +281,7 @@ class Engine {
     while (this.audioIdx < notes.length && notes[this.audioIdx].start <= next) {
       const n = notes[this.audioIdx++];
       const idx = this.audioIdx - 1;
-      if (s.appSound && !this.isRequired(idx)) synth.noteOn(n.midi, 0.55, n.dur / bps);
+      if (s.appSound) synth.noteOn(n.midi, this.isRequired(idx) ? 0.3 : 0.6, n.dur / bps);
     }
 
     if (next >= s.song.length + 0.5) {

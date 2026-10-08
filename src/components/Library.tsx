@@ -17,7 +17,7 @@ export function Library() {
   }, []);
 
   const pick = (i: number) => {
-    useEngine.setState({ song: songs[i], hands: cat.hands, playing: false, loop: null });
+    useEngine.setState({ song: songs[i], playing: false, loop: null });
   };
 
   return (
