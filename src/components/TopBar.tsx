@@ -68,6 +68,17 @@ export function TopBar() {
           {label}
           <span className="text-white/35">· computer keys C{octave}</span>
         </button>
+        {midi.status === "denied" && (
+          <a
+            href={window.location.href}
+            target="_blank"
+            rel="noreferrer"
+            className="max-w-[22rem] rounded-lg bg-rose-500/15 px-3 py-1.5 text-[11px] leading-snug text-rose-100 hover:bg-rose-500/25"
+            title={midi.detail}
+          >
+            {midi.detail || "Open in a Chrome tab to enable MIDI"}
+          </a>
+        )}
         <SoundPanel />
         <button
           onClick={() => setLibraryOpen(true)}

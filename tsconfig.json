@@ -9,7 +9,7 @@
     "noUnusedLocals": true,
     "skipLibCheck": true,
     "isolatedModules": true,
-    "types": ["vite/client", "webmidi"]
+    "types": ["vite/client"]
   },
   "include": ["src", "vite.config.ts"]
 }
