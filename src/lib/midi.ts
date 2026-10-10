@@ -46,6 +46,7 @@ function handle(port: string, e: Event) {
     log(`empty message from ${port}`);
     return;
   }
+  messages += 1;
   const s = data[0];
   const d1 = data.length > 1 ? data[1] : 0;
   const d2 = data.length > 2 ? data[2] : 0;
@@ -79,6 +80,8 @@ let connecting: Promise<void> | null = null;
 let binding = false;
 let bindAgain = false;
 let lastSig = "";
+let messages = 0;
+const hooked = new WeakSet<MIDIInput>();
 
 function describe(input: MIDIInput) {
   return {
@@ -91,7 +94,17 @@ function describe(input: MIDIInput) {
   };
 }
 
-async function bindInputs(midi: MIDIAccess) {
+function attach(input: MIDIInput) {
+  const label = input.name ?? input.manufacturer ?? "MIDI keyboard";
+  const fn = (event: Event) => handle(label, event);
+  input.onmidimessage = fn;
+  if (!hooked.has(input)) {
+    input.addEventListener("midimessage", fn);
+    hooked.add(input);
+  }
+}
+
+function bindInputs(midi: MIDIAccess) {
   if (binding) {
     bindAgain = true;
     return;
@@ -104,29 +117,31 @@ async function bindInputs(midi: MIDIAccess) {
       midi.inputs.forEach((input) => {
         if (input.state !== "disconnected") live.push(input);
       });
-      const sig = live.map((input) => `${input.id}:${input.state}:${input.connection}`).join("|");
+      const sig = live.map((input) => `${input.id}:${input.state}:${input.connection}:${typeof input.onmidimessage}`).join("|");
       const changed = sig !== lastSig;
       lastSig = sig;
       if (changed) log(`inputs seen: ${live.length}`, live.map(describe));
       const keys = live.filter((input) => !isAudioInterface(input));
       const chosen = keys.length ? keys : live;
       const skipped = live.filter((input) => !chosen.includes(input));
-      if (changed && skipped.length) log("skipped audio-interface ports", skipped.map((input) => input.name));
+      for (const input of skipped) {
+        input.onmidimessage = null;
+        void input.close();
+      }
+      if (changed && skipped.length) log("closed audio-interface ports", skipped.map((input) => input.name));
       openInputs.length = 0;
       const names: string[] = [];
       for (const input of chosen) {
         openInputs.push(input);
-        const label = input.name ?? input.manufacturer ?? "MIDI keyboard";
-        try {
-          await input.open();
-          if (changed) log(`opened ${label}`, { state: input.state, connection: input.connection });
-        } catch (err) {
-          log(`open() failed ${label}`, err instanceof Error ? err.message : String(err));
-        }
-        input.onmidimessage = (event) => handle(label, event);
-        names.push(label);
+        attach(input);
+        names.push(input.name ?? input.manufacturer ?? "MIDI keyboard");
       }
-      if (changed) log(names.length ? `listening: ${names.join(" | ")}` : "listening: no ports");
+      if (changed) {
+        log(names.length ? `listening (no explicit open): ${names.join(" | ")}` : "listening: no ports");
+        const outs: string[] = [];
+        midi.outputs.forEach((output) => outs.push(`${output.name ?? "out"}:${output.state}`));
+        log("outputs", outs);
+      }
       useMidi.setState({ status: "ready", inputs: names });
     } while (bindAgain);
   } finally {
@@ -163,10 +178,17 @@ export function connectMidi(): Promise<void> {
         access.onstatechange = (event) => {
           const port = event.port;
           log("statechange", port ? { name: port.name, type: port.type, state: port.state, connection: port.connection } : "no port");
-          if (access) void bindInputs(access);
+          if (access) bindInputs(access);
         };
+        let heartbeats = 0;
+        window.setInterval(() => {
+          if (!access || messages > 0 || heartbeats >= 5) return;
+          heartbeats += 1;
+          const attached = openInputs.map((input) => `${input.name ?? "input"}:${input.onmidimessage ? "handler" : "NO HANDLER"}:${input.connection}`);
+          log(`still no MIDI bytes. ${attached.join(" | ") || "no inputs kept"}`);
+        }, 4000);
       }
-      await bindInputs(access);
+      bindInputs(access);
     } catch (err) {
       access = null;
       log("requestMIDIAccess FAILED", err instanceof Error ? `${err.name}: ${err.message}` : String(err));
