@@ -13,28 +13,19 @@ export function TopBar() {
   const song = useEngine((s) => s.song);
   const playing = useEngine((s) => s.playing);
   const fileRef = useRef<HTMLInputElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [hover, setHover] = useState(false);
-  const [idle, setIdle] = useState(false);
-  const hideStats = playing && idle && !hover;
+  const collapsed = playing && !hover;
 
   useEffect(() => {
-    if (!playing) {
-      setIdle(false);
-      return;
-    }
-    let timer = window.setTimeout(() => setIdle(true), 1000);
-    const poke = () => {
-      setIdle(false);
-      window.clearTimeout(timer);
-      timer = window.setTimeout(() => setIdle(true), 1000);
+    const onMove = (e: PointerEvent) => {
+      const inside = barRef.current?.contains(e.target as Node) ?? false;
+      setHover(inside || e.clientY < 28);
     };
-    window.addEventListener("pointermove", poke);
-    return () => {
-      window.clearTimeout(timer);
-      window.removeEventListener("pointermove", poke);
-    };
-  }, [playing]);
+    window.addEventListener("pointermove", onMove);
+    return () => window.removeEventListener("pointermove", onMove);
+  }, []);
 
   const load = async (f?: File) => {
     if (!f) return;
@@ -57,11 +48,14 @@ export function TopBar() {
         : "No keyboard detected";
 
   return (
-    <header
-      className="glass pointer-events-auto grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1.5 rounded-2xl px-4 py-2.5 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:gap-3"
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-    >
+    <div ref={barRef} className="pointer-events-auto">
+      <div
+        className={`grid transition-[grid-template-rows,opacity] duration-300 ease-out ${
+          collapsed ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100"
+        }`}
+      >
+        <div className="overflow-hidden">
+          <header className="glass pointer-events-auto grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1.5 rounded-2xl px-4 py-2.5 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:gap-3">
       <div className="col-start-1 row-start-1 flex min-w-0 items-center gap-3">
         <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-cyan-400 via-indigo-500 to-pink-500 text-lg font-extrabold text-white shadow-lg shadow-indigo-500/30">
           K
@@ -75,9 +69,7 @@ export function TopBar() {
       </div>
 
       <div
-        className={`col-span-2 row-start-2 justify-self-center overflow-hidden transition-all duration-300 sm:col-span-1 sm:col-start-2 sm:row-start-1 ${
-          hideStats ? "max-h-0 max-w-0 opacity-0" : "max-h-10 max-w-[24rem] opacity-100"
-        }`}
+        className={`col-span-2 row-start-2 justify-self-center overflow-hidden sm:col-span-1 sm:col-start-2 sm:row-start-1 max-h-10 max-w-[24rem]`}
       >
         <Stats />
       </div>
@@ -118,6 +110,9 @@ export function TopBar() {
           </button>
         )}
       </div>
-    </header>
+          </header>
+        </div>
+      </div>
+    </div>
   );
 }
