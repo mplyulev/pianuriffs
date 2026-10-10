@@ -145,6 +145,7 @@ class Engine {
     }
     this.audioIdx = lowerBound(s.song, this.pos - 1e-6);
     this.lastNow = performance.now();
+    this.lastTickAt = this.lastNow;
   }
 
   private nextPendingIdx(): number {
@@ -182,7 +183,7 @@ class Engine {
       return;
     }
 
-    const posAtEvent = this.pos + ((e.time - this.lastTickAt) / 1000) * bps;
+    const posAtEvent = this.pos + ((performance.now() - this.lastTickAt) / 1000) * bps;
     const win = HIT_WINDOW_SEC * bps;
     let best = -1;
     let bestDist = Infinity;

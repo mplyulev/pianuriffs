@@ -20,16 +20,23 @@ export default function App() {
       if (e.code === "Space" && (e.target as HTMLElement).tagName !== "BUTTON") {
         e.preventDefault();
         synth.unlock();
+        void connectMidi();
         useEngine.setState((s) => ({ playing: !s.playing }));
       }
     };
-    const unlock = () => synth.unlock();
+    const wake = () => {
+      synth.unlock();
+      void connectMidi();
+    };
     window.addEventListener("keydown", key);
-    window.addEventListener("pointerdown", unlock, { once: true });
+    window.addEventListener("pointerdown", wake);
+    window.addEventListener("focus", wake);
     return () => {
       r.destroy();
       off();
       window.removeEventListener("keydown", key);
+      window.removeEventListener("pointerdown", wake);
+      window.removeEventListener("focus", wake);
     };
   }, []);
 

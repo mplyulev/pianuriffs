@@ -28,30 +28,84 @@ export const useMidi = create<MidiState>(() => ({
   inputs: [],
 }));
 
-function handle(e: WebMidi.MIDIMessageEvent) {
-  const [s, d1, d2] = e.data;
+function handle(e: Event) {
+  const data = (e as MIDIMessageEvent).data;
+  if (!data || data.length < 2) return;
+  const s = data[0];
+  const d1 = data[1];
+  const d2 = data.length > 2 ? data[2] : 0;
   const cmd = s & 0xf0;
-  if (cmd === 0x90 && d2 > 0) emitNote(d1, d2 / 127, e.timeStamp, true);
-  else if (cmd === 0x80 || (cmd === 0x90 && d2 === 0)) emitNote(d1, 0, e.timeStamp, false);
+  const time = performance.now();
+  if (cmd === 0x90 && d2 > 0) emitNote(d1, d2 / 127, time, true);
+  else if (cmd === 0x80 || (cmd === 0x90 && d2 === 0)) emitNote(d1, 0, time, false);
 }
 
-export async function connectMidi() {
-  if (!useMidi.getState().supported) return;
-  try {
-    const access = await navigator.requestMIDIAccess();
-    const refresh = () => {
-      const names: string[] = [];
-      access.inputs.forEach((input) => {
-        names.push(input.name ?? "MIDI device");
-        input.onmidimessage = handle;
-      });
-      useMidi.setState({ status: "ready", inputs: names });
-    };
-    access.onstatechange = refresh;
-    refresh();
-  } catch {
-    useMidi.setState({ status: "denied" });
+const AUDIO_IFACE = /focusrite|scarlett|clarett|realtek|voicemeeter|loopbe|loopmidi/i;
+
+function isAudioInterface(input: MIDIInput) {
+  return AUDIO_IFACE.test(`${input.name ?? ""} ${input.manufacturer ?? ""}`);
+}
+
+let access: MIDIAccess | null = null;
+const openInputs: MIDIInput[] = [];
+let connecting: Promise<void> | null = null;
+let binding = false;
+let bindAgain = false;
+
+async function bindInputs(midi: MIDIAccess) {
+  if (binding) {
+    bindAgain = true;
+    return;
   }
+  binding = true;
+  try {
+    do {
+      bindAgain = false;
+      const live: MIDIInput[] = [];
+      midi.inputs.forEach((input) => {
+        if (input.state !== "disconnected") live.push(input);
+      });
+      const keys = live.filter((input) => !isAudioInterface(input));
+      const chosen = keys.length ? keys : live;
+      openInputs.length = 0;
+      const names: string[] = [];
+      for (const input of chosen) {
+        openInputs.push(input);
+        try {
+          await input.open();
+        } catch {
+          /* port may already be open */
+        }
+        input.onmidimessage = handle;
+        names.push(input.name ?? input.manufacturer ?? "MIDI keyboard");
+      }
+      useMidi.setState({ status: "ready", inputs: names });
+    } while (bindAgain);
+  } finally {
+    binding = false;
+  }
+}
+
+export function connectMidi(): Promise<void> {
+  if (!useMidi.getState().supported) return Promise.resolve();
+  if (connecting) return connecting;
+  connecting = (async () => {
+    try {
+      if (!access) {
+        access = await navigator.requestMIDIAccess({ sysex: false });
+        access.onstatechange = () => {
+          if (access) void bindInputs(access);
+        };
+      }
+      await bindInputs(access);
+    } catch {
+      access = null;
+      useMidi.setState({ status: "denied", inputs: [] });
+    } finally {
+      connecting = null;
+    }
+  })();
+  return connecting;
 }
 
 const KEYMAP: Record<string, number> = {
