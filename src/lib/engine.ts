@@ -49,6 +49,8 @@ export interface HitFx {
   midi: number;
   hand: Hand;
   perfect: boolean;
+  index: number;
+  dur: number;
 }
 
 function lowerBound(song: Song, beat: number): number {
@@ -222,7 +224,7 @@ class Engine {
     this.stats.hits++;
     this.stats.streak++;
     this.stats.best = Math.max(this.stats.best, this.stats.streak);
-    this.fx.push({ midi: n.midi, hand: n.hand, perfect });
+    this.fx.push({ midi: n.midi, hand: n.hand, perfect, index: i, dur: n.dur });
     this.judgement = {
       text: perfect ? "Perfect" : "Good",
       at: performance.now(),

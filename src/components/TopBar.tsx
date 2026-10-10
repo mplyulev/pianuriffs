@@ -4,6 +4,7 @@ import { useEngine } from "../lib/engine";
 import { DEMO_SONG, parseMidiFile } from "../lib/song";
 import { setLibraryOpen } from "../lib/ui";
 import { SoundPanel } from "./SoundPanel";
+import { LookPanel } from "./LookPanel";
 import { CoffeeButton } from "./CoffeeButton";
 import { Stats } from "./Stats";
 
@@ -21,8 +22,8 @@ export function TopBar() {
   useEffect(() => {
     const onMove = (e: PointerEvent) => {
       const inside = barRef.current?.contains(e.target as Node) ?? false;
-      const soundsOpen = document.body.dataset.sounds === "open";
-      setHover(inside || e.clientY < 28 || soundsOpen);
+      const panelOpen = document.body.dataset.sounds === "open" || document.body.dataset.look === "open";
+      setHover(inside || e.clientY < 28 || panelOpen);
     };
     window.addEventListener("pointermove", onMove);
     return () => window.removeEventListener("pointermove", onMove);
@@ -89,6 +90,7 @@ export function TopBar() {
         </div>
         <CoffeeButton />
         <SoundPanel />
+        <LookPanel />
         <button
           onClick={() => setLibraryOpen(true)}
           className="rounded-lg bg-gradient-to-r from-cyan-400/90 to-indigo-500/90 px-3.5 py-1.5 text-xs font-bold text-white shadow-md shadow-indigo-500/25 transition hover:brightness-110"
