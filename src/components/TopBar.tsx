@@ -4,6 +4,7 @@ import { useEngine } from "../lib/engine";
 import { DEMO_SONG, parseMidiFile } from "../lib/song";
 import { setLibraryOpen } from "../lib/ui";
 import { SoundPanel } from "./SoundPanel";
+import { CoffeeButton } from "./CoffeeButton";
 
 export function TopBar() {
   const midi = useMidi();
@@ -58,6 +59,7 @@ export function TopBar() {
           {label}
           {!connected && <span className="text-white/30">· oct {octave}</span>}
         </div>
+        <CoffeeButton />
         <SoundPanel />
         <button
           onClick={() => setLibraryOpen(true)}

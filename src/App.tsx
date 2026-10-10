@@ -1,6 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Renderer } from "./lib/renderer";
-import { connectMidi, installComputerKeyboard, useMidi } from "./lib/midi";
+import { connectMidi, installComputerKeyboard } from "./lib/midi";
 import { useEngine } from "./lib/engine";
 import { synth } from "./lib/audio";
 import { TopBar } from "./components/TopBar";
@@ -8,19 +8,13 @@ import { Controls } from "./components/Controls";
 import { Stats } from "./components/Stats";
 import { Results } from "./components/Results";
 import { Library } from "./components/Library";
-
-function MidiDebug() {
-  const lines = useMidi((s) => s.debug);
-  if (!lines.length) return null;
-  return (
-    <pre className="pointer-events-none absolute bottom-3 left-3 z-30 max-h-48 max-w-[min(36rem,calc(100%-1.5rem))] overflow-hidden rounded-lg bg-black/80 p-2 text-[10px] leading-snug whitespace-pre-wrap text-emerald-200">
-      {lines.join("\n")}
-    </pre>
-  );
-}
+import { Welcome } from "./components/Welcome";
+import { SponsorCard } from "./components/SponsorCard";
 
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [welcome, setWelcome] = useState(true);
+  const [sponsor, setSponsor] = useState(true);
 
   useEffect(() => {
     const r = new Renderer(canvasRef.current!);
@@ -56,15 +50,18 @@ export default function App() {
       <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-3 sm:p-4">
         <div className="flex flex-col gap-3">
           <TopBar />
-          <div className="flex justify-end">
-            <Stats />
+          <div className="flex items-start gap-3">
+            {!welcome && sponsor && <SponsorCard slot="dock" onDismiss={() => setSponsor(false)} />}
+            <div className="ml-auto">
+              <Stats />
+            </div>
           </div>
         </div>
       </div>
       <Controls />
       <Results />
       <Library />
-      <MidiDebug />
+      {welcome && <Welcome onEnter={() => setWelcome(false)} />}
     </div>
   );
 }
