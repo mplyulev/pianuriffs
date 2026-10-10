@@ -1,5 +1,6 @@
 import type { Song } from "../song";
 import { CLASSICAL } from "./classical";
+import { FAMILIAR } from "./familiar";
 import { JAZZ } from "./styles";
 import { BLUES, FUNK, HIPHOP, LOFI, POP, RNB, ROCK } from "./grooves";
 import { COUNTRY, GOSPEL, LATIN, RAGTIME, REGGAE, SYNTH } from "./world";
@@ -37,6 +38,7 @@ export interface Category {
 export const CATEGORIES: Category[] = [
   { id: "classical", name: "Songs & Classics", blurb: "Public-domain favourites", accent: "from-cyan-400 to-indigo-500", hands: { L: false, R: true }, items: [...CLASSICAL, ...extraClassical] },
   { id: "pop", name: "Pop Progressions", blurb: "Loops you hear everywhere", accent: "from-pink-400 to-rose-500", hands: { L: true, R: true }, items: [...POP, ...extraPop] },
+  { id: "familiar", name: "Familiar Riffs", blurb: "Original hooks in the spirit of songs you know", accent: "from-rose-400 to-amber-300", hands: { L: true, R: true }, items: FAMILIAR },
   { id: "lofi", name: "Lo-Fi", blurb: "Mellow jazzy loops to study to", accent: "from-orange-200 to-rose-400", hands: { L: false, R: true }, items: [...LOFI, ...extraLofi] },
   { id: "rnb", name: "R&B / Soul", blurb: "Smooth grooves and slow jams", accent: "from-fuchsia-300 to-purple-500", hands: { L: false, R: true }, items: [...RNB, ...extraRnb] },
   { id: "hiphop", name: "Hip-Hop", blurb: "Boom bap, trap and sample loops", accent: "from-yellow-300 to-amber-500", hands: { L: false, R: true }, items: [...HIPHOP, ...extraHiphop] },
