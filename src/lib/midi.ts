@@ -77,11 +77,13 @@ function isAudioInterface(input: MIDIInput) {
 let access: MIDIAccess | null = null;
 const openInputs: MIDIInput[] = [];
 let connecting: Promise<void> | null = null;
-let binding = false;
-let bindAgain = false;
-let lastSig = "";
+let arming = false;
 let messages = 0;
-const hooked = new WeakSet<MIDIInput>();
+const resetDone = new WeakSet<MIDIInput>();
+
+function isDawPort(input: MIDIInput) {
+  return /MIDIIN\d|\bDAW\b|MCU|HUI/i.test(`${input.name ?? ""} ${input.manufacturer ?? ""}`);
+}
 
 function describe(input: MIDIInput) {
   return {
@@ -91,61 +93,59 @@ function describe(input: MIDIInput) {
     connection: input.connection,
     id: input.id,
     audioInterface: isAudioInterface(input),
+    dawPort: isDawPort(input),
   };
 }
 
-function attach(input: MIDIInput) {
+async function arm(input: MIDIInput) {
   const label = input.name ?? input.manufacturer ?? "MIDI keyboard";
   const fn = (event: Event) => handle(label, event);
   input.onmidimessage = fn;
-  if (!hooked.has(input)) {
-    input.addEventListener("midimessage", fn);
-    hooked.add(input);
+  if (resetDone.has(input)) return;
+  resetDone.add(input);
+  try {
+    await input.close();
+    input.onmidimessage = fn;
+    await input.open();
+    input.onmidimessage = fn;
+    log(`listening ${label}`, { connection: input.connection });
+  } catch (err) {
+    input.onmidimessage = fn;
+    log(`could not reset ${label}`, err instanceof Error ? err.message : String(err));
   }
 }
 
-function bindInputs(midi: MIDIAccess) {
-  if (binding) {
-    bindAgain = true;
-    return;
-  }
-  binding = true;
+async function bindInputs(midi: MIDIAccess) {
+  if (arming) return;
+  arming = true;
   try {
-    do {
-      bindAgain = false;
-      const live: MIDIInput[] = [];
-      midi.inputs.forEach((input) => {
-        if (input.state !== "disconnected") live.push(input);
-      });
-      const sig = live.map((input) => `${input.id}:${input.state}:${input.connection}:${typeof input.onmidimessage}`).join("|");
-      const changed = sig !== lastSig;
-      lastSig = sig;
-      if (changed) log(`inputs seen: ${live.length}`, live.map(describe));
-      const keys = live.filter((input) => !isAudioInterface(input));
-      const chosen = keys.length ? keys : live;
-      const skipped = live.filter((input) => !chosen.includes(input));
-      for (const input of skipped) {
-        input.onmidimessage = null;
-        void input.close();
+    const live: MIDIInput[] = [];
+    midi.inputs.forEach((input) => {
+      if (input.state !== "disconnected") live.push(input);
+    });
+    log(`inputs seen: ${live.length}`, live.map(describe));
+    const playable = live.filter((input) => !isAudioInterface(input) && !isDawPort(input));
+    const chosen = playable.length ? playable : live.filter((input) => !isAudioInterface(input));
+    for (const input of live) {
+      if (chosen.includes(input)) continue;
+      input.onmidimessage = null;
+      try {
+        await input.close();
+        log(`closed ${input.name ?? "port"} (${isDawPort(input) ? "DAW port" : "audio interface"})`);
+      } catch (err) {
+        log(`close failed ${input.name ?? "port"}`, err instanceof Error ? err.message : String(err));
       }
-      if (changed && skipped.length) log("closed audio-interface ports", skipped.map((input) => input.name));
-      openInputs.length = 0;
-      const names: string[] = [];
-      for (const input of chosen) {
-        openInputs.push(input);
-        attach(input);
-        names.push(input.name ?? input.manufacturer ?? "MIDI keyboard");
-      }
-      if (changed) {
-        log(names.length ? `listening (no explicit open): ${names.join(" | ")}` : "listening: no ports");
-        const outs: string[] = [];
-        midi.outputs.forEach((output) => outs.push(`${output.name ?? "out"}:${output.state}`));
-        log("outputs", outs);
-      }
-      useMidi.setState({ status: "ready", inputs: names });
-    } while (bindAgain);
+    }
+    openInputs.length = 0;
+    const names: string[] = [];
+    for (const input of chosen) {
+      openInputs.push(input);
+      await arm(input);
+      names.push(input.name ?? input.manufacturer ?? "MIDI keyboard");
+    }
+    useMidi.setState({ status: "ready", inputs: names });
   } finally {
-    binding = false;
+    arming = false;
   }
 }
 
@@ -177,8 +177,12 @@ export function connectMidi(): Promise<void> {
         log("requestMIDIAccess ok", { inputs: access.inputs.size, outputs: access.outputs.size });
         access.onstatechange = (event) => {
           const port = event.port;
+          if (arming) return;
           log("statechange", port ? { name: port.name, type: port.type, state: port.state, connection: port.connection } : "no port");
-          if (access) bindInputs(access);
+          if (!access || !port || port.type !== "input" || port.state !== "connected") return;
+          if (isAudioInterface(port as MIDIInput) || isDawPort(port as MIDIInput)) return;
+          if ((port as MIDIInput).onmidimessage) return;
+          void bindInputs(access);
         };
         let heartbeats = 0;
         window.setInterval(() => {
