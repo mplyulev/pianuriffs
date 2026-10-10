@@ -163,6 +163,7 @@ class Engine {
       return;
     }
     this.held.add(e.midi);
+    console.log("[midi] engine note", e.midi, "playing", this.s.playing, "mode", this.s.mode);
     synth.noteOn(e.midi, 0.4 + e.velocity * 0.6);
     const s = this.s;
     if (!s.playing) return;

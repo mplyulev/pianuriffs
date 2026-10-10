@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Renderer } from "./lib/renderer";
-import { connectMidi, installComputerKeyboard } from "./lib/midi";
+import { connectMidi, installComputerKeyboard, useMidi } from "./lib/midi";
 import { useEngine } from "./lib/engine";
 import { synth } from "./lib/audio";
 import { TopBar } from "./components/TopBar";
@@ -8,6 +8,16 @@ import { Controls } from "./components/Controls";
 import { Stats } from "./components/Stats";
 import { Results } from "./components/Results";
 import { Library } from "./components/Library";
+
+function MidiDebug() {
+  const lines = useMidi((s) => s.debug);
+  if (!lines.length) return null;
+  return (
+    <pre className="pointer-events-none absolute bottom-3 left-3 z-30 max-h-48 max-w-[min(36rem,calc(100%-1.5rem))] overflow-hidden rounded-lg bg-black/80 p-2 text-[10px] leading-snug whitespace-pre-wrap text-emerald-200">
+      {lines.join("\n")}
+    </pre>
+  );
+}
 
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -54,6 +64,7 @@ export default function App() {
       <Controls />
       <Results />
       <Library />
+      <MidiDebug />
     </div>
   );
 }

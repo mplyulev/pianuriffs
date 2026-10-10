@@ -214,6 +214,7 @@ class Synth {
 
   noteOn(midi: number, velocity = 0.8, sustainSec?: number) {
     const ctx = this.ensure();
+    if (ctx.state !== "running") console.warn("[midi] audio context", ctx.state);
     this.prune();
     const patch = this.patchFor(midi);
     const now = ctx.currentTime;

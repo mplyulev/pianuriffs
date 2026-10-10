@@ -20,25 +20,52 @@ interface MidiState {
   supported: boolean;
   status: "idle" | "ready" | "denied";
   inputs: string[];
+  debug: string[];
 }
 
 export const useMidi = create<MidiState>(() => ({
   supported: typeof navigator !== "undefined" && "requestMIDIAccess" in navigator,
   status: "idle",
   inputs: [],
+  debug: [],
 }));
 
-function handle(e: Event) {
+const debugLines: string[] = [];
+
+function log(message: string, extra?: unknown) {
+  const line = extra === undefined ? message : `${message} ${typeof extra === "string" ? extra : JSON.stringify(extra)}`;
+  console.log("[midi]", message, extra ?? "");
+  debugLines.push(line);
+  if (debugLines.length > 80) debugLines.shift();
+  useMidi.setState({ debug: debugLines.slice(-14) });
+}
+
+function handle(port: string, e: Event) {
   const data = (e as MIDIMessageEvent).data;
-  if (!data || data.length < 2) return;
+  if (!data || data.length < 1) {
+    log(`empty message from ${port}`);
+    return;
+  }
   const s = data[0];
-  const d1 = data[1];
+  const d1 = data.length > 1 ? data[1] : 0;
   const d2 = data.length > 2 ? data[2] : 0;
   const cmd = s & 0xf0;
   const time = performance.now();
-  if (cmd === 0x90 && d2 > 0) emitNote(d1, d2 / 127, time, true);
-  else if (cmd === 0x80 || (cmd === 0x90 && d2 === 0)) emitNote(d1, 0, time, false);
+  if (cmd === 0x90 && d2 > 0) {
+    log(`NOTE ON ${d1} vel ${d2} ← ${port}`);
+    emitNote(d1, d2 / 127, time, true);
+  } else if (cmd === 0x80 || (cmd === 0x90 && d2 === 0)) {
+    log(`note off ${d1} ← ${port}`);
+    emitNote(d1, 0, time, false);
+  } else {
+    const key = `${port}:${s}`;
+    const n = (otherCount.get(key) ?? 0) + 1;
+    otherCount.set(key, n);
+    if (n <= 2) log(`non-note 0x${s.toString(16)} ${d1} ${d2} ← ${port}`);
+  }
 }
+
+const otherCount = new Map<string, number>();
 
 const AUDIO_IFACE = /focusrite|scarlett|clarett|realtek|voicemeeter|loopbe|loopmidi/i;
 
@@ -51,6 +78,18 @@ const openInputs: MIDIInput[] = [];
 let connecting: Promise<void> | null = null;
 let binding = false;
 let bindAgain = false;
+let lastSig = "";
+
+function describe(input: MIDIInput) {
+  return {
+    name: input.name,
+    manufacturer: input.manufacturer,
+    state: input.state,
+    connection: input.connection,
+    id: input.id,
+    audioInterface: isAudioInterface(input),
+  };
+}
 
 async function bindInputs(midi: MIDIAccess) {
   if (binding) {
@@ -65,20 +104,29 @@ async function bindInputs(midi: MIDIAccess) {
       midi.inputs.forEach((input) => {
         if (input.state !== "disconnected") live.push(input);
       });
+      const sig = live.map((input) => `${input.id}:${input.state}:${input.connection}`).join("|");
+      const changed = sig !== lastSig;
+      lastSig = sig;
+      if (changed) log(`inputs seen: ${live.length}`, live.map(describe));
       const keys = live.filter((input) => !isAudioInterface(input));
       const chosen = keys.length ? keys : live;
+      const skipped = live.filter((input) => !chosen.includes(input));
+      if (changed && skipped.length) log("skipped audio-interface ports", skipped.map((input) => input.name));
       openInputs.length = 0;
       const names: string[] = [];
       for (const input of chosen) {
         openInputs.push(input);
+        const label = input.name ?? input.manufacturer ?? "MIDI keyboard";
         try {
           await input.open();
-        } catch {
-          /* port may already be open */
+          if (changed) log(`opened ${label}`, { state: input.state, connection: input.connection });
+        } catch (err) {
+          log(`open() failed ${label}`, err instanceof Error ? err.message : String(err));
         }
-        input.onmidimessage = handle;
-        names.push(input.name ?? input.manufacturer ?? "MIDI keyboard");
+        input.onmidimessage = (event) => handle(label, event);
+        names.push(label);
       }
+      if (changed) log(names.length ? `listening: ${names.join(" | ")}` : "listening: no ports");
       useMidi.setState({ status: "ready", inputs: names });
     } while (bindAgain);
   } finally {
@@ -87,19 +135,41 @@ async function bindInputs(midi: MIDIAccess) {
 }
 
 export function connectMidi(): Promise<void> {
-  if (!useMidi.getState().supported) return Promise.resolve();
+  if (!useMidi.getState().supported) {
+    log("requestMIDIAccess missing", { secure: window.isSecureContext, framed: window.parent !== window, origin: location.origin });
+    return Promise.resolve();
+  }
   if (connecting) return connecting;
   connecting = (async () => {
+    if (!access) {
+      log("connectMidi()", {
+        secure: window.isSecureContext,
+        framed: window.parent !== window,
+        origin: location.origin,
+      });
+    }
     try {
       if (!access) {
+        const perm = await navigator.permissions.query({ name: "midi" as PermissionName }).catch((err: unknown) => {
+          log("permission query failed", err instanceof Error ? err.message : String(err));
+          return null;
+        });
+        if (perm) log(`permission: ${perm.state}`);
+      }
+      if (!access) {
+        log("calling requestMIDIAccess");
         access = await navigator.requestMIDIAccess({ sysex: false });
-        access.onstatechange = () => {
+        log("requestMIDIAccess ok", { inputs: access.inputs.size, outputs: access.outputs.size });
+        access.onstatechange = (event) => {
+          const port = event.port;
+          log("statechange", port ? { name: port.name, type: port.type, state: port.state, connection: port.connection } : "no port");
           if (access) void bindInputs(access);
         };
       }
       await bindInputs(access);
-    } catch {
+    } catch (err) {
       access = null;
+      log("requestMIDIAccess FAILED", err instanceof Error ? `${err.name}: ${err.message}` : String(err));
       useMidi.setState({ status: "denied", inputs: [] });
     } finally {
       connecting = null;
