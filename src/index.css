@@ -47,3 +47,23 @@ input[type="range"]::-moz-range-thumb {
   width: 14px; height: 14px; border: 0; border-radius: 50%;
   background: #fff; box-shadow: 0 0 0 4px rgba(129, 140, 248, 0.35);
 }
+
+.look-color {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.look-color::-webkit-color-swatch-wrapper { padding: 0; }
+.look-color::-webkit-color-swatch {
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 10px;
+}
+.look-color::-moz-color-swatch {
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 10px;
+}
