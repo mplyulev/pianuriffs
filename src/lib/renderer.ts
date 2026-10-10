@@ -334,85 +334,94 @@ export class Renderer {
   private drawBurns(top: number, now: number, light: boolean) {
     const ctx = this.ctx;
     const theme = useLook.getState().notes;
-    ctx.globalCompositeOperation = light ? "source-over" : "lighter";
     for (const b of this.burns) {
       const c = theme.hands[b.hand];
       const fade = b.ash > 0 ? 1 - b.ash : 1;
-      const ignite = b.ash > 0 ? 1 : Math.min(1, b.along / 0.06);
-      const amp = (b.perfect ? 1 : 0.72) * fade * Math.max(ignite, 0.55);
+      const ignite = b.ash > 0 ? 1 : Math.min(1, b.along / 0.05);
+      const amp = (b.perfect ? 1 : 0.78) * fade * Math.max(ignite, 0.62);
       const hgt = Math.max(0, b.bottom - b.yt);
-      const flicker = 0.82 + 0.18 * Math.sin(now * 0.018 + b.midi);
+      const flicker = 0.86 + 0.14 * Math.sin(now * 0.02 + b.midi);
       const cx = b.x + b.bw / 2;
 
+      ctx.globalCompositeOperation = "source-over";
       if (hgt > 2 && b.ash === 0) {
-        const eat = Math.min(hgt, Math.max(10, hgt * (0.34 + b.along * 0.48)));
+        const eat = Math.min(hgt, Math.max(22, hgt * (0.55 + b.along * 0.4)));
         ctx.save();
         ctx.beginPath();
         ctx.roundRect(b.x, b.yt, b.bw, hgt, Math.min(6, b.bw / 3, hgt / 2));
         ctx.clip();
         const band = ctx.createLinearGradient(0, b.bottom - eat, 0, b.bottom);
-        band.addColorStop(0, `hsla(${c.hue},90%,60%,0)`);
-        band.addColorStop(0.45, `hsla(24,100%,54%,${0.4 * amp})`);
-        band.addColorStop(0.82, `hsla(40,100%,62%,${0.62 * amp})`);
-        band.addColorStop(1, `hsla(50,100%,92%,${0.85 * amp})`);
+        band.addColorStop(0, `hsla(${c.hue},90%,58%,0)`);
+        band.addColorStop(0.28, `hsla(14,100%,48%,${0.45 * amp})`);
+        band.addColorStop(0.62, `hsla(32,100%,56%,${0.92 * amp})`);
+        band.addColorStop(1, `hsla(50,100%,86%,${amp})`);
         ctx.fillStyle = band;
         ctx.fillRect(b.x, b.bottom - eat, b.bw, eat);
 
         const tongues = b.perfect ? 4 : 3;
         for (let i = 0; i < tongues; i++) {
-          const phase = now * 0.009 + i * 1.9 + b.index * 0.4;
-          const sway = Math.sin(phase) * b.bw * 0.12;
-          const th = Math.min(eat * (0.72 + 0.28 * Math.sin(phase * 1.4)) * flicker, hgt);
-          const hw = b.bw * (b.perfect ? 0.13 : 0.18);
+          const phase = now * 0.011 + i * 1.9 + b.index * 0.4;
+          const sway = Math.sin(phase) * b.bw * 0.1;
+          const th = Math.min(eat * (0.78 + 0.28 * Math.sin(phase * 1.3)) * flicker, hgt);
+          const hw = Math.max(3, b.bw * (b.perfect ? 0.16 : 0.2));
           const tx = b.x + (b.bw * (i + 0.5)) / tongues + sway;
-          this.flame(tx, b.bottom, hw, Math.max(8, th), amp, c.hue, Math.sin(phase * 0.7) * hw * 0.6);
+          this.flame(tx, b.bottom, hw, Math.max(12, th), amp, Math.sin(phase * 0.7) * hw * 0.45);
         }
         ctx.restore();
-        ctx.fillStyle = `rgba(255,248,230,${0.55 * amp})`;
-        ctx.fillRect(b.x + b.bw * 0.18, b.bottom - 3, b.bw * 0.64, 2);
+        ctx.fillStyle = `rgba(255,250,235,${0.85 * amp})`;
+        ctx.fillRect(b.x + b.bw * 0.16, b.bottom - 3.5, b.bw * 0.68, 2.5);
       }
 
-      const sparks = b.perfect ? 9 : 6;
-      const riseMax = Math.max(16, Math.min(hgt > 2 ? hgt * 0.96 : 28, 150));
+      const sparks = b.perfect ? 11 : 7;
+      const riseMax = Math.max(22, Math.min(hgt > 2 ? hgt * 0.98 : 36, 170));
       for (let i = 0; i < sparks; i++) {
-        const cycle = (b.perfect ? 620 : 840) + i * 70;
+        const cycle = (b.perfect ? 540 : 760) + i * 60;
         const t = ((now + i * 137 + b.index * 53 + b.midi * 17) % cycle) / cycle;
         const spread = hash(b.index * 13 + i * 7 + b.midi);
-        const ex = b.x + b.bw * (0.12 + 0.76 * spread) + Math.sin(now * 0.004 + i) * 1.4;
-        const ey = b.bottom - t * riseMax * (b.ash > 0 ? 0.45 : 1);
-        const a = Math.sin(t * Math.PI) * amp * (b.perfect ? 0.95 : 0.7);
-        if (a < 0.03) continue;
-        const hue = i % 3 === 0 ? c.hue : i % 3 === 1 ? 42 : 18;
-        ctx.fillStyle = `hsla(${hue},100%,${70 + t * 20}%,${a})`;
+        const ex = b.x + b.bw * (0.08 + 0.84 * spread) + Math.sin(now * 0.005 + i) * 1.6;
+        const ey = b.bottom - t * riseMax * (b.ash > 0 ? 0.5 : 1);
+        const a = Math.sin(t * Math.PI) * amp;
+        if (a < 0.04) continue;
+        const hot = i % 3 !== 2;
+        const rad = (hot ? 2.4 : 3.1) * (1.15 - t * 0.4);
+        ctx.fillStyle = hot ? `rgba(255,236,170,${a})` : `rgba(255,120,40,${a * 0.9})`;
         ctx.beginPath();
-        ctx.arc(ex, ey, (b.perfect ? 2.1 : 2.4) * (1.2 - t * 0.45), 0, Math.PI * 2);
+        ctx.arc(ex, ey, rad, 0, Math.PI * 2);
         ctx.fill();
+        if (hot && a > 0.25) {
+          ctx.fillStyle = `rgba(255,255,255,${a * 0.85})`;
+          ctx.beginPath();
+          ctx.arc(ex, ey, rad * 0.45, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
 
-      const rad = (this.keys.get(b.midi)?.w ?? b.bw) * (b.perfect ? 0.9 : 1.1);
-      const bloom = amp * (b.perfect ? 0.7 : 0.4);
-      const g = ctx.createRadialGradient(cx, top + 8, 1, cx, top + 16, rad);
-      g.addColorStop(0, `hsla(48,100%,86%,${bloom})`);
-      g.addColorStop(0.45, `hsla(${c.hue},100%,62%,${bloom * 0.5})`);
-      g.addColorStop(1, `hsla(18,100%,50%,0)`);
+      const rad = (this.keys.get(b.midi)?.w ?? b.bw) * (b.perfect ? 1.05 : 1.25);
+      const bloom = amp * (b.perfect ? 0.85 : 0.5);
+      ctx.globalCompositeOperation = light ? "source-over" : "lighter";
+      const g = ctx.createRadialGradient(cx, top + 6, 1, cx, top + 18, rad);
+      g.addColorStop(0, `hsla(50,100%,88%,${light ? bloom * 0.55 : bloom})`);
+      g.addColorStop(0.4, `hsla(28,100%,58%,${bloom * 0.45})`);
+      g.addColorStop(1, `hsla(12,100%,46%,0)`);
       ctx.fillStyle = g;
-      ctx.fillRect(cx - rad, top, rad * 2, this.keyH * 0.62);
+      ctx.fillRect(cx - rad, top, rad * 2, this.keyH * 0.72);
     }
     ctx.globalCompositeOperation = "source-over";
   }
 
-  private flame(cx: number, base: number, hw: number, h: number, amp: number, hue: number, lean: number) {
+  private flame(cx: number, base: number, hw: number, h: number, amp: number, lean: number) {
     const ctx = this.ctx;
     const tip = base - h;
     ctx.beginPath();
     ctx.moveTo(cx - hw, base);
-    ctx.quadraticCurveTo(cx - hw * 0.2, base - h * 0.55, cx + lean, tip);
-    ctx.quadraticCurveTo(cx + hw * 0.35, base - h * 0.42, cx + hw, base);
+    ctx.quadraticCurveTo(cx - hw * 0.15, base - h * 0.45, cx + lean, tip);
+    ctx.quadraticCurveTo(cx + hw * 0.2, base - h * 0.4, cx + hw, base);
     ctx.closePath();
     const g = ctx.createLinearGradient(0, tip, 0, base);
-    g.addColorStop(0, `hsla(${hue},100%,74%,0)`);
-    g.addColorStop(0.32, `hsla(32,100%,58%,${0.5 * amp})`);
-    g.addColorStop(1, `hsla(50,100%,92%,${0.8 * amp})`);
+    g.addColorStop(0, `rgba(255,244,210,0)`);
+    g.addColorStop(0.25, `rgba(255,186,48,${0.35 * amp})`);
+    g.addColorStop(0.7, `rgba(255,92,18,${0.75 * amp})`);
+    g.addColorStop(1, `rgba(255,236,180,${0.95 * amp})`);
     ctx.fillStyle = g;
     ctx.fill();
   }
@@ -458,8 +467,8 @@ export class Renderer {
         top0 = "#ff5d6c";
         bot = "#c2263a";
       } else if (burn > 0.2) {
-        top0 = `hsl(40,100%,${k.black ? 26 + burn * 24 : 68 + burn * 16}%)`;
-        bot = `hsl(16,96%,${k.black ? 14 + burn * 12 : 42 + burn * 10}%)`;
+        top0 = `hsl(48,100%,${k.black ? 34 + burn * 28 : 82 + burn * 12}%)`;
+        bot = `hsl(16,100%,${k.black ? 18 + burn * 14 : 46 + burn * 8}%)`;
       } else if (held) {
         top0 = k.black ? stage.heldBlackTop : stage.heldWhiteTop;
         bot = k.black ? stage.heldBlackBot : stage.heldWhiteBot;
@@ -493,8 +502,9 @@ export class Renderer {
     if (mode !== "echo" || finished || engine.pos < origin) return;
     const ctx = this.ctx;
     const reply = engine.echoPhase === "reply";
+    const light = useLook.getState().stage.light;
     ctx.globalAlpha = 0.92;
-    ctx.fillStyle = reply ? "#fde68a" : "#a5f3fc";
+    ctx.fillStyle = light ? (reply ? "#92400e" : "#0f766e") : reply ? "#fde68a" : "#a5f3fc";
     ctx.font = "700 16px Inter, system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.fillText(reply ? "Your turn" : "Listen", this.w / 2, top - 56);
@@ -507,8 +517,9 @@ export class Renderer {
     const age = (now - j.at) / 700;
     if (age >= 1) return;
     const ctx = this.ctx;
+    const light = useLook.getState().stage.light;
     ctx.globalAlpha = 1 - age;
-    ctx.fillStyle = j.good ? "#a5f3fc" : "#fda4af";
+    ctx.fillStyle = light ? (j.good ? "#0f766e" : "#be123c") : j.good ? "#a5f3fc" : "#fda4af";
     ctx.font = "700 22px Inter, system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.fillText(j.text, this.w / 2, top - 28 - age * 22);
@@ -520,7 +531,7 @@ export class Renderer {
     const n = Math.ceil(-engine.pos);
     const frac = -engine.pos - Math.floor(-engine.pos);
     ctx.globalAlpha = 0.25 + 0.75 * (1 - frac);
-    ctx.fillStyle = "#fff";
+    ctx.fillStyle = useLook.getState().stage.light ? "#3f2a1d" : "#fff";
     ctx.font = "800 120px Inter, system-ui, sans-serif";
     ctx.textAlign = "center";
     ctx.fillText(String(n), this.w / 2, top / 2 + 40);

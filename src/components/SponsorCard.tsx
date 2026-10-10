@@ -28,7 +28,7 @@ export function SponsorCard({ slot, onDismiss }: { slot: Slot; onDismiss?: () =>
         href={SPONSOR.href}
         target="_blank"
         rel="sponsored noreferrer"
-        className={`block rounded-2xl border border-white/10 bg-white/[0.04] transition hover:border-white/18 hover:bg-white/[0.07] ${
+        className={`block rounded-2xl border border-white/10 bg-black/50 backdrop-blur-md transition hover:border-white/20 hover:bg-black/60 ${
           slot === "welcome" ? "px-4 py-3.5" : "px-3 py-2.5"
         }`}
       >
