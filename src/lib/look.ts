@@ -3,6 +3,24 @@ import type { Hand } from "./song";
 
 export type PaletteId = "current" | "aurora" | "ember" | "ink";
 export type StageId = "midnight" | "dusk" | "lagoon" | "hearth" | "grove" | "rose" | "parchment" | "paper" | "custom";
+export type HitStyleId = "lock" | "pulse" | "data" | "beam" | "phase";
+export type MissStyleId = "dissolve" | "glitch" | "pixel" | "drift" | "wipe";
+
+export const HIT_STYLES: { id: HitStyleId; name: string }[] = [
+  { id: "lock", name: "Lock" },
+  { id: "pulse", name: "Pulse" },
+  { id: "data", name: "Data" },
+  { id: "beam", name: "Beam" },
+  { id: "phase", name: "Phase" },
+];
+
+export const MISS_STYLES: { id: MissStyleId; name: string }[] = [
+  { id: "dissolve", name: "Dissolve" },
+  { id: "glitch", name: "Glitch" },
+  { id: "pixel", name: "Pixel" },
+  { id: "drift", name: "Drift" },
+  { id: "wipe", name: "Wipe" },
+];
 
 export interface HandColor {
   hue: number;
@@ -328,18 +346,33 @@ function validHex(v: unknown) {
   return typeof v === "string" && /^#[0-9a-fA-F]{6}$/.test(v) ? v.toLowerCase() : null;
 }
 
+const hitStyle = (id: unknown): HitStyleId => (HIT_STYLES.some((p) => p.id === id) ? (id as HitStyleId) : "lock");
+const missStyle = (id: unknown): MissStyleId => (MISS_STYLES.some((p) => p.id === id) ? (id as MissStyleId) : "dissolve");
+
 function load() {
-  const fallback = { notesId: "current" as PaletteId, stageId: "midnight" as StageId, custom: DEFAULT_CUSTOM };
+  const fallback = {
+    notesId: "current" as PaletteId,
+    stageId: "midnight" as StageId,
+    custom: DEFAULT_CUSTOM,
+    hitFx: "lock" as HitStyleId,
+    missFx: "dissolve" as MissStyleId,
+  };
   try {
     const raw = localStorage.getItem(KEY) ?? "";
     if (!raw) return fallback;
     if (raw.startsWith("{")) {
-      const j = JSON.parse(raw) as { notes?: string; stage?: string; custom?: string };
+      const j = JSON.parse(raw) as { notes?: string; stage?: string; custom?: string; hit?: string; miss?: string };
       const notesId = NOTE_THEMES.some((p) => p.id === j.notes) ? (j.notes as PaletteId) : fallback.notesId;
       const stageId = j.stage === "custom" || STAGES.some((p) => p.id === j.stage) ? (j.stage as StageId) : fallback.stageId;
-      return { notesId, stageId, custom: validHex(j.custom) ?? DEFAULT_CUSTOM };
+      return {
+        notesId,
+        stageId,
+        custom: validHex(j.custom) ?? DEFAULT_CUSTOM,
+        hitFx: hitStyle(j.hit),
+        missFx: missStyle(j.miss),
+      };
     }
-    if (raw === "ink") return { notesId: "ink" as PaletteId, stageId: "parchment" as StageId, custom: "#1c1814" };
+    if (raw === "ink") return { ...fallback, notesId: "ink" as PaletteId, stageId: "parchment" as StageId, custom: "#1c1814" };
     if (NOTE_THEMES.some((p) => p.id === raw)) return { ...fallback, notesId: raw as PaletteId };
   } catch {
     /* keep the defaults */
@@ -347,9 +380,9 @@ function load() {
   return fallback;
 }
 
-function persist(notesId: PaletteId, stageId: StageId, custom: string) {
+function persist(notesId: PaletteId, stageId: StageId, custom: string, hitFx: HitStyleId, missFx: MissStyleId) {
   try {
-    localStorage.setItem(KEY, JSON.stringify({ notes: notesId, stage: stageId, custom }));
+    localStorage.setItem(KEY, JSON.stringify({ notes: notesId, stage: stageId, custom, hit: hitFx, miss: missFx }));
   } catch {
     /* storage can be blocked */
   }
@@ -371,27 +404,41 @@ interface LookState {
   custom: string;
   notes: NoteTheme;
   stage: Stage;
+  hitFx: HitStyleId;
+  missFx: MissStyleId;
   setNotes: (id: PaletteId) => void;
   setStage: (id: StageId) => void;
   setCustom: (hex: string) => void;
+  setHitFx: (id: HitStyleId) => void;
+  setMissFx: (id: MissStyleId) => void;
 }
 
 const initial = load();
 
 export const useLook = create<LookState>((set) => ({
   ...resolve(initial.notesId, initial.stageId, initial.custom),
+  hitFx: initial.hitFx,
+  missFx: initial.missFx,
   setNotes: (id) => set((s) => {
-    persist(id, s.stageId, s.custom);
+    persist(id, s.stageId, s.custom, s.hitFx, s.missFx);
     return resolve(id, s.stageId, s.custom);
   }),
   setStage: (id) => set((s) => {
-    persist(s.notesId, id, s.custom);
+    persist(s.notesId, id, s.custom, s.hitFx, s.missFx);
     return resolve(s.notesId, id, s.custom);
   }),
   setCustom: (hex) => set((s) => {
     const custom = validHex(hex);
     if (!custom) return s;
-    persist(s.notesId, "custom", custom);
+    persist(s.notesId, "custom", custom, s.hitFx, s.missFx);
     return resolve(s.notesId, "custom", custom);
+  }),
+  setHitFx: (id) => set((s) => {
+    persist(s.notesId, s.stageId, s.custom, id, s.missFx);
+    return { hitFx: id };
+  }),
+  setMissFx: (id) => set((s) => {
+    persist(s.notesId, s.stageId, s.custom, s.hitFx, id);
+    return { missFx: id };
   }),
 }));

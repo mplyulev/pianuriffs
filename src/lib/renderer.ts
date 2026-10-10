@@ -1,6 +1,6 @@
 import { engine, HIT, MISSED, useEngine } from "./engine";
 import { emitNote } from "./midi";
-import { useLook } from "./look";
+import { useLook, type HitStyleId } from "./look";
 import type { Hand } from "./song";
 
 const BLACK = new Set([1, 3, 6, 8, 10]);
@@ -8,6 +8,14 @@ const BLACK = new Set([1, 3, 6, 8, 10]);
 function hash(n: number) {
   const x = Math.sin(n * 127.1) * 43758.5453;
   return x - Math.floor(x);
+}
+
+function hitHue(style: HitStyleId) {
+  if (style === "pulse") return 168;
+  if (style === "data") return 268;
+  if (style === "beam") return 196;
+  if (style === "phase") return 312;
+  return 188;
 }
 const isBlack = (m: number) => BLACK.has(m % 12);
 
@@ -26,13 +34,14 @@ interface Burn {
   ash: number;
 }
 
-interface MissDrop {
+interface MissAnim {
   x: number;
-  w: number;
-  y0: number;
-  y1: number;
+  bw: number;
+  yt: number;
+  yb: number;
   hue: number;
-  a: number;
+  t: number;
+  index: number;
 }
 
 interface KeyGeom {
@@ -54,7 +63,7 @@ export class Renderer {
   private perfect = new Map<number, boolean>();
   private burns: Burn[] = [];
   private burningKeys = new Map<number, number>();
-  private drops: MissDrop[] = [];
+  private misses: MissAnim[] = [];
   private pointerNote: number | null = null;
   private ro: ResizeObserver;
   private unsub: () => void;
@@ -71,6 +80,7 @@ export class Renderer {
         this.perfect.clear();
         this.burns = [];
         this.burningKeys.clear();
+        this.misses = [];
       }
     });
     canvas.addEventListener("pointerdown", this.down);
@@ -214,7 +224,7 @@ export class Renderer {
     this.collectPerfect();
     this.burns = [];
     this.burningKeys.clear();
-    this.drops.length = 0;
+    this.misses = [];
 
     const sounding = new Map<number, Hand>();
     const ashWindow = 0.28;
@@ -224,11 +234,11 @@ export class Renderer {
       if (n.start > pos + VISIBLE_BEATS) break;
       const end = n.start + n.dur;
       const past = pos - end;
-      if (past > ashWindow) continue;
+      const st = engine.status[i];
+      if (past > (st === MISSED ? 0.85 : ashWindow)) continue;
       const k = this.keys.get(n.midi);
       if (!k) continue;
-      const st = engine.status[i];
-      if (n.start <= pos && past <= 0) sounding.set(n.midi, n.hand);
+      if (n.start <= pos && past <= 0 && st !== MISSED) sounding.set(n.midi, n.hand);
       const c = theme.hands[n.hand];
       const inset = k.black ? 1 : 2;
       const x = k.x + inset;
@@ -236,13 +246,6 @@ export class Renderer {
       const yb = top - (n.start - pos) * ppb;
       const yt = Math.min(yb - n.dur * ppb, top);
       const bottom = Math.min(yb, top);
-      if (st === MISSED && yb > top) {
-        const span = this.keyH * 0.72;
-        const travel = (yb - top) / span;
-        const y0 = Math.max(top, yt);
-        const y1 = Math.min(yb, top + span);
-        if (travel < 1 && y1 - y0 > 1) this.drops.push({ x, w: bw, y0, y1, hue: c.hue, a: 0.34 * (1 - travel) });
-      }
       const holding = st === HIT && n.start <= pos && past <= ashWindow;
       const perfect = this.perfect.get(i) ?? false;
       if (holding) {
@@ -251,6 +254,12 @@ export class Renderer {
         this.burns.push({ hand: n.hand, midi: n.midi, index: i, x, bw, yt, bottom: top, perfect, along, ash });
         const strength = ash > 0 ? (1 - ash) * 0.85 : 1;
         if (strength > (this.burningKeys.get(n.midi) ?? 0)) this.burningKeys.set(n.midi, strength);
+      }
+      if (st === MISSED && yb > top - 4) {
+        const since = Math.max(0, pos - n.start);
+        const fadeT = Math.min(1, since / Math.max(n.dur, 0.45));
+        this.misses.push({ x, bw, yt, yb, hue: c.hue, t: fadeT, index: i });
+        continue;
       }
       if (past > 0) continue;
       const hgt = bottom - yt;
@@ -281,15 +290,8 @@ export class Renderer {
         ctx.fill();
       }
       const g = ctx.createLinearGradient(0, yt, 0, bottom);
-      if (holding) {
-        const eat = Math.min(0.82, 0.26 + (n.dur <= 1e-4 ? 1 : Math.min(1, Math.max(0, (pos - n.start) / n.dur))) * 0.5);
-        g.addColorStop(0, `hsla(${c.hue},${sat}%,${l1}%,${a})`);
-        g.addColorStop(Math.max(0, 1 - eat), `hsla(${c.hue},${sat}%,${l2}%,${a})`);
-        g.addColorStop(1, `hsla(42,${perfect ? 100 : 90}%,${perfect ? 74 : 62}%,${a})`);
-      } else {
-        g.addColorStop(0, `hsla(${c.hue},${sat}%,${l1}%,${a})`);
-        g.addColorStop(1, `hsla(${c.hue + 18},${sat}%,${l2}%,${a})`);
-      }
+      g.addColorStop(0, `hsla(${c.hue},${sat}%,${l1}%,${a})`);
+      g.addColorStop(1, `hsla(${c.hue + 18},${sat}%,${l2}%,${a})`);
       if (st === HIT && n.start > pos) {
         ctx.fillStyle = `hsla(${c.hue},100%,70%,0.22)`;
         ctx.fillRect(x - 4, yt, bw + 8, hgt);
@@ -311,8 +313,8 @@ export class Renderer {
     ctx.fillRect(0, top - 36, w, 36);
 
     this.drawKeyboard(top, sounding, now);
-    this.drawBurns(top, now, stage.light);
-    this.drawMissDrops();
+    this.drawHitFx(top, now, stage.light);
+    this.drawMissFx(top, now);
     this.drawHitLine(top);
     this.drawEchoCue(top, s.mode, s.finished, s.loop?.a ?? 0);
     this.drawJudgement(top, now);
@@ -331,109 +333,289 @@ export class Renderer {
     }
   }
 
-  private drawBurns(top: number, now: number, light: boolean) {
+  private drawHitFx(top: number, now: number, light: boolean) {
     const ctx = this.ctx;
+    const style = useLook.getState().hitFx;
     const theme = useLook.getState().notes;
     for (const b of this.burns) {
       const c = theme.hands[b.hand];
       const fade = b.ash > 0 ? 1 - b.ash : 1;
-      const ignite = b.ash > 0 ? 1 : Math.min(1, b.along / 0.05);
-      const amp = (b.perfect ? 1 : 0.78) * fade * Math.max(ignite, 0.62);
+      const amp = (b.perfect ? 1 : 0.7) * fade;
+      if (amp < 0.03) continue;
       const hgt = Math.max(0, b.bottom - b.yt);
-      const flicker = 0.86 + 0.14 * Math.sin(now * 0.02 + b.midi);
       const cx = b.x + b.bw / 2;
-
-      ctx.globalCompositeOperation = "source-over";
-      if (hgt > 2 && b.ash === 0) {
-        const eat = Math.min(hgt, Math.max(22, hgt * (0.55 + b.along * 0.4)));
-        ctx.save();
-        ctx.beginPath();
-        ctx.roundRect(b.x, b.yt, b.bw, hgt, Math.min(6, b.bw / 3, hgt / 2));
-        ctx.clip();
-        const band = ctx.createLinearGradient(0, b.bottom - eat, 0, b.bottom);
-        band.addColorStop(0, `hsla(${c.hue},90%,58%,0)`);
-        band.addColorStop(0.28, `hsla(14,100%,48%,${0.45 * amp})`);
-        band.addColorStop(0.62, `hsla(32,100%,56%,${0.92 * amp})`);
-        band.addColorStop(1, `hsla(50,100%,86%,${amp})`);
-        ctx.fillStyle = band;
-        ctx.fillRect(b.x, b.bottom - eat, b.bw, eat);
-
-        const tongues = b.perfect ? 4 : 3;
-        for (let i = 0; i < tongues; i++) {
-          const phase = now * 0.011 + i * 1.9 + b.index * 0.4;
-          const sway = Math.sin(phase) * b.bw * 0.1;
-          const th = Math.min(eat * (0.78 + 0.28 * Math.sin(phase * 1.3)) * flicker, hgt);
-          const hw = Math.max(3, b.bw * (b.perfect ? 0.16 : 0.2));
-          const tx = b.x + (b.bw * (i + 0.5)) / tongues + sway;
-          this.flame(tx, b.bottom, hw, Math.max(12, th), amp, Math.sin(phase * 0.7) * hw * 0.45);
-        }
-        ctx.restore();
-        ctx.fillStyle = `rgba(255,250,235,${0.85 * amp})`;
-        ctx.fillRect(b.x + b.bw * 0.16, b.bottom - 3.5, b.bw * 0.68, 2.5);
-      }
-
-      const sparks = b.perfect ? 11 : 7;
-      const riseMax = Math.max(22, Math.min(hgt > 2 ? hgt * 0.98 : 36, 170));
-      for (let i = 0; i < sparks; i++) {
-        const cycle = (b.perfect ? 540 : 760) + i * 60;
-        const t = ((now + i * 137 + b.index * 53 + b.midi * 17) % cycle) / cycle;
-        const spread = hash(b.index * 13 + i * 7 + b.midi);
-        const ex = b.x + b.bw * (0.08 + 0.84 * spread) + Math.sin(now * 0.005 + i) * 1.6;
-        const ey = b.bottom - t * riseMax * (b.ash > 0 ? 0.5 : 1);
-        const a = Math.sin(t * Math.PI) * amp;
-        if (a < 0.04) continue;
-        const hot = i % 3 !== 2;
-        const rad = (hot ? 2.4 : 3.1) * (1.15 - t * 0.4);
-        ctx.fillStyle = hot ? `rgba(255,236,170,${a})` : `rgba(255,120,40,${a * 0.9})`;
-        ctx.beginPath();
-        ctx.arc(ex, ey, rad, 0, Math.PI * 2);
-        ctx.fill();
-        if (hot && a > 0.25) {
-          ctx.fillStyle = `rgba(255,255,255,${a * 0.85})`;
-          ctx.beginPath();
-          ctx.arc(ex, ey, rad * 0.45, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
-
-      const rad = (this.keys.get(b.midi)?.w ?? b.bw) * (b.perfect ? 1.05 : 1.25);
-      const bloom = amp * (b.perfect ? 0.85 : 0.5);
-      ctx.globalCompositeOperation = light ? "source-over" : "lighter";
-      const g = ctx.createRadialGradient(cx, top + 6, 1, cx, top + 18, rad);
-      g.addColorStop(0, `hsla(50,100%,88%,${light ? bloom * 0.55 : bloom})`);
-      g.addColorStop(0.4, `hsla(28,100%,58%,${bloom * 0.45})`);
-      g.addColorStop(1, `hsla(12,100%,46%,0)`);
-      ctx.fillStyle = g;
-      ctx.fillRect(cx - rad, top, rad * 2, this.keyH * 0.72);
+      if (style === "lock") this.fxLock(b, hgt, now, amp);
+      else if (style === "pulse") this.fxPulse(b, hgt, cx, now, amp);
+      else if (style === "data") this.fxData(b, c.hue, hgt, now, amp);
+      else if (style === "beam") this.fxBeam(b, hgt, cx, now, amp);
+      else this.fxPhase(b, hgt, now, amp);
+      this.keyGlow(cx, top, (this.keys.get(b.midi)?.w ?? b.bw) * 1.15, amp, hitHue(style), light);
     }
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = 1;
+  }
+
+  private fxLock(b: Burn, hgt: number, now: number, amp: number) {
+    const ctx = this.ctx;
+    if (hgt < 3 || b.ash > 0) return;
+    const sweep = (now * 0.00115 + b.index * 0.17) % 1;
+    const y = b.yt + sweep * hgt;
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(b.x, b.yt, b.bw, hgt, Math.min(6, b.bw / 3, hgt / 2));
+    ctx.clip();
+    ctx.fillStyle = `hsla(188,100%,72%,${0.22 * amp})`;
+    ctx.fillRect(b.x, y - 8, b.bw, 16);
+    ctx.fillStyle = `rgba(255,255,255,${0.92 * amp})`;
+    ctx.fillRect(b.x, y - 1, b.bw, 2);
+    ctx.fillStyle = `hsla(188,100%,74%,${0.7 * amp})`;
+    ctx.fillRect(b.x, b.yt, 1.6, hgt);
+    ctx.fillRect(b.x + b.bw - 1.6, b.yt, 1.6, hgt);
+    ctx.restore();
+    const br = Math.min(11, hgt * 0.28, b.bw * 0.4);
+    ctx.strokeStyle = `rgba(214,252,255,${0.95 * amp})`;
+    ctx.lineWidth = 1.5;
+    this.bracket(b.x, b.yt, br, 1, 1);
+    this.bracket(b.x + b.bw, b.yt, br, -1, 1);
+    this.bracket(b.x, b.bottom, br, 1, -1);
+    this.bracket(b.x + b.bw, b.bottom, br, -1, -1);
+  }
+
+  private fxPulse(b: Burn, hgt: number, cx: number, now: number, amp: number) {
+    const ctx = this.ctx;
+    const reach = Math.max(hgt, 28);
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 4; i++) {
+      const u = (now * 0.00135 + i * 0.25 + b.index * 0.05) % 1;
+      const y = b.bottom - u * reach;
+      const a = Math.sin(u * Math.PI) * amp * 0.85;
+      ctx.strokeStyle = `hsla(168,100%,${70 + u * 15}%,${a})`;
+      ctx.beginPath();
+      ctx.ellipse(cx, y, Math.max(4, b.bw * (0.28 + u * 0.85)), 4 + u * 7, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    if (hgt > 4 && b.ash === 0) {
+      ctx.fillStyle = `hsla(168,100%,80%,${0.16 * amp})`;
+      ctx.fillRect(b.x, b.yt, b.bw, hgt);
+    }
+  }
+
+  private fxData(b: Burn, hue: number, hgt: number, now: number, amp: number) {
+    const ctx = this.ctx;
+    const reach = Math.max(hgt, 24);
+    const bits = b.perfect ? 12 : 8;
+    for (let i = 0; i < bits; i++) {
+      const cycle = 420 + (i % 5) * 50;
+      const u = ((now + i * 97 + b.index * 41) % cycle) / cycle;
+      const ex = b.x + b.bw * (0.12 + 0.76 * hash(b.index * 5 + i * 3));
+      const ey = b.bottom - u * reach;
+      const a = Math.sin(u * Math.PI) * amp;
+      if (a < 0.04) continue;
+      const w = Math.max(2, b.bw * 0.2);
+      ctx.fillStyle = i % 2 === 0 ? `rgba(206,255,255,${a})` : `hsla(${hue},85%,68%,${a})`;
+      ctx.fillRect(ex, ey, w, i % 3 === 0 ? 5 : 3);
+    }
+  }
+
+  private fxBeam(b: Burn, hgt: number, cx: number, now: number, amp: number) {
+    const ctx = this.ctx;
+    const y0 = b.ash > 0 ? b.bottom - 18 : b.yt;
+    const wob = 0.72 + 0.28 * Math.sin(now * 0.018 + b.midi);
+    const half = Math.max(2, b.bw * 0.16 * wob);
+    const beam = ctx.createLinearGradient(cx - half * 2, 0, cx + half * 2, 0);
+    beam.addColorStop(0, `hsla(196,100%,70%,0)`);
+    beam.addColorStop(0.5, `hsla(190,100%,82%,${0.72 * amp})`);
+    beam.addColorStop(1, `hsla(196,100%,70%,0)`);
+    ctx.fillStyle = beam;
+    ctx.fillRect(cx - half * 2, y0, half * 4, b.bottom - y0);
+    ctx.fillStyle = `rgba(255,255,255,${0.88 * amp})`;
+    ctx.fillRect(cx - 1, y0, 2, b.bottom - y0);
+    ctx.lineWidth = 1.4;
+    for (let i = 0; i < 4; i++) {
+      const u = (now * 0.0011 + i * 0.25) % 1;
+      const y = y0 + u * Math.max(8, b.bottom - y0);
+      ctx.strokeStyle = `rgba(220,255,255,${(1 - u) * amp * 0.9})`;
+      ctx.beginPath();
+      ctx.moveTo(cx - b.bw * 0.42, y - 5);
+      ctx.lineTo(cx, y + 3);
+      ctx.lineTo(cx + b.bw * 0.42, y - 5);
+      ctx.stroke();
+    }
+  }
+
+  private fxPhase(b: Burn, hgt: number, now: number, amp: number) {
+    const ctx = this.ctx;
+    if (hgt < 3 || b.ash > 0) return;
+    const jx = Math.sin(now * 0.028 + b.index) * (1.4 + (b.perfect ? 1.2 : 2));
+    const r = Math.min(6, b.bw / 3, hgt / 2);
+    ctx.globalAlpha = 0.42 * amp;
+    ctx.fillStyle = "#67f7ff";
+    ctx.beginPath();
+    ctx.roundRect(b.x + jx, b.yt, b.bw, hgt, r);
+    ctx.fill();
+    ctx.fillStyle = "#ff4ad2";
+    ctx.beginPath();
+    ctx.roundRect(b.x - jx, b.yt, b.bw, hgt, r);
+    ctx.fill();
+    ctx.globalAlpha = 0.9 * amp;
+    ctx.strokeStyle = "rgba(255,255,255,0.85)";
+    ctx.lineWidth = 1.25;
+    ctx.beginPath();
+    ctx.roundRect(b.x, b.yt, b.bw, hgt, r);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  private bracket(x: number, y: number, len: number, sx: number, sy: number) {
+    const ctx = this.ctx;
+    ctx.beginPath();
+    ctx.moveTo(x + sx * len, y);
+    ctx.lineTo(x, y);
+    ctx.lineTo(x, y + sy * len);
+    ctx.stroke();
+  }
+
+  private keyGlow(cx: number, top: number, rad: number, amp: number, hue: number, light: boolean) {
+    const ctx = this.ctx;
+    ctx.globalCompositeOperation = light ? "source-over" : "lighter";
+    const g = ctx.createRadialGradient(cx, top + 8, 1, cx, top + 18, rad);
+    g.addColorStop(0, `hsla(${hue},100%,78%,${amp * (light ? 0.42 : 0.72)})`);
+    g.addColorStop(1, `hsla(${hue},100%,60%,0)`);
+    ctx.fillStyle = g;
+    ctx.fillRect(cx - rad, top, rad * 2, this.keyH * 0.62);
     ctx.globalCompositeOperation = "source-over";
   }
 
-  private flame(cx: number, base: number, hw: number, h: number, amp: number, lean: number) {
-    const ctx = this.ctx;
-    const tip = base - h;
-    ctx.beginPath();
-    ctx.moveTo(cx - hw, base);
-    ctx.quadraticCurveTo(cx - hw * 0.15, base - h * 0.45, cx + lean, tip);
-    ctx.quadraticCurveTo(cx + hw * 0.2, base - h * 0.4, cx + hw, base);
-    ctx.closePath();
-    const g = ctx.createLinearGradient(0, tip, 0, base);
-    g.addColorStop(0, `rgba(255,244,210,0)`);
-    g.addColorStop(0.25, `rgba(255,186,48,${0.35 * amp})`);
-    g.addColorStop(0.7, `rgba(255,92,18,${0.75 * amp})`);
-    g.addColorStop(1, `rgba(255,236,180,${0.95 * amp})`);
-    ctx.fillStyle = g;
-    ctx.fill();
+  private drawMissFx(top: number, now: number) {
+    const style = useLook.getState().missFx;
+    for (const m of this.misses) {
+      if (style === "dissolve") this.missDissolve(m, top);
+      else if (style === "glitch") this.missGlitch(m, top, now);
+      else if (style === "pixel") this.missPixel(m, top);
+      else if (style === "drift") this.missDrift(m, top);
+      else this.missWipe(m, top);
+    }
+    this.ctx.globalAlpha = 1;
   }
 
-  private drawMissDrops() {
+  private missDissolve(m: MissAnim, top: number) {
     const ctx = this.ctx;
-    for (const d of this.drops) {
-      ctx.fillStyle = `hsla(${d.hue},8%,58%,${d.a})`;
+    const live = Math.min(m.yb, top) - m.yt;
+    const a = 0.78 * (1 - m.t);
+    if (live > 1 && a > 0.02) {
+      ctx.globalAlpha = a;
+      ctx.fillStyle = `hsla(${m.hue},10%,62%,1)`;
       ctx.beginPath();
-      ctx.roundRect(d.x, d.y0, d.w, d.y1 - d.y0, Math.min(6, d.w / 3, (d.y1 - d.y0) / 2));
+      ctx.roundRect(m.x, m.yt, m.bw, live, Math.min(6, m.bw / 3, live / 2));
       ctx.fill();
     }
+    this.missTail(m, top, 0, 0.4 * (1 - m.t));
+  }
+
+  private missGlitch(m: MissAnim, top: number, now: number) {
+    const ctx = this.ctx;
+    const y1 = Math.min(m.yb, top);
+    const live = y1 - m.yt;
+    if (live > 2) {
+      const bands = 6;
+      const bh = live / bands;
+      for (let i = 0; i < bands; i++) {
+        if (hash(m.index * 9 + i) < m.t * 0.72) continue;
+        const shift = Math.sin(now * 0.02 + i * 1.7 + m.index) * (3 + m.t * 16);
+        ctx.globalAlpha = 0.8 * (1 - m.t * 0.75);
+        ctx.fillStyle = i % 2 ? `hsla(${m.hue},18%,64%,1)` : `hsla(${m.hue},6%,48%,1)`;
+        ctx.fillRect(m.x + shift, m.yt + i * bh, m.bw, Math.max(1, bh - 1));
+      }
+    }
+    this.missTail(m, top, Math.sin(now * 0.01 + m.index) * 10 * m.t, 0.32 * (1 - m.t));
+    ctx.globalAlpha = 1;
+  }
+
+  private missPixel(m: MissAnim, top: number) {
+    const ctx = this.ctx;
+    const y1 = Math.min(m.yb, top);
+    const live = y1 - m.yt;
+    const cell = Math.max(4, Math.min(8, m.bw / 2.4));
+    if (live > 2) {
+      const cols = Math.max(1, Math.round(m.bw / cell));
+      const rows = Math.max(1, Math.ceil(live / cell));
+      for (let row = 0; row < rows; row++) {
+        if (m.t > (row + 1) / rows) continue;
+        for (let col = 0; col < cols; col++) {
+          if (hash(m.index * 13 + row * 5 + col) < m.t * 0.35) continue;
+          ctx.globalAlpha = 0.85 * (1 - m.t);
+          ctx.fillStyle = (row + col) % 2 ? `hsla(${m.hue},14%,66%,1)` : `hsla(${m.hue},6%,46%,1)`;
+          ctx.fillRect(m.x + col * (m.bw / cols), y1 - (row + 1) * (live / rows), m.bw / cols - 1, live / rows - 1);
+        }
+      }
+    }
+    const span = this.keyH * 0.55;
+    const n = 4;
+    for (let i = 0; i < n; i++) {
+      const u = Math.min(1, m.t + i * 0.08);
+      ctx.globalAlpha = 0.45 * (1 - u);
+      ctx.fillStyle = `hsla(${m.hue},8%,60%,1)`;
+      const s = 3 + (i % 2);
+      ctx.fillRect(m.x + m.bw * hash(m.index + i), top + u * span, s, s);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  private missDrift(m: MissAnim, top: number) {
+    const ctx = this.ctx;
+    const live = Math.min(m.yb, top) - m.yt;
+    const dx = (hash(m.index) - 0.5) * 36 * m.t;
+    const dy = m.t * 26;
+    if (live > 1) {
+      ctx.globalAlpha = 0.22 * (1 - m.t);
+      ctx.fillStyle = `hsla(${m.hue},8%,60%,1)`;
+      ctx.beginPath();
+      ctx.roundRect(m.x + dx * 0.45, m.yt + dy * 0.45, m.bw, live, 4);
+      ctx.fill();
+      ctx.globalAlpha = 0.72 * (1 - m.t);
+      ctx.beginPath();
+      ctx.roundRect(m.x + dx, m.yt + dy, m.bw, live, 4);
+      ctx.fill();
+    }
+    this.missTail(m, top, dx, 0.28 * (1 - m.t));
+  }
+
+  private missWipe(m: MissAnim, top: number) {
+    const ctx = this.ctx;
+    const y1 = Math.min(m.yb, top);
+    const live = y1 - m.yt;
+    if (live > 1) {
+      const keep = live * (1 - m.t);
+      if (keep > 1) {
+        ctx.globalAlpha = 0.75 * (1 - m.t * 0.35);
+        ctx.fillStyle = `hsla(${m.hue},12%,58%,1)`;
+        ctx.beginPath();
+        ctx.roundRect(m.x, m.yt, m.bw, keep, Math.min(6, m.bw / 3, keep / 2));
+        ctx.fill();
+      }
+      const edge = m.yt + keep;
+      ctx.globalAlpha = 0.9 * (1 - m.t);
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      ctx.fillRect(m.x, edge - 1.5, m.bw, 2);
+    }
+    this.missTail(m, top, 0, 0.34 * (1 - m.t));
+    ctx.globalAlpha = 1;
+  }
+
+  private missTail(m: MissAnim, top: number, dx: number, alpha: number) {
+    if (m.yb <= top || alpha < 0.02) return;
+    const span = this.keyH * 0.62;
+    const y1 = Math.min(m.yb, top + span);
+    const h = y1 - top;
+    if (h < 1) return;
+    const travel = (m.yb - top) / span;
+    const ctx = this.ctx;
+    ctx.globalAlpha = alpha * Math.max(0, 1 - travel);
+    ctx.fillStyle = `hsla(${m.hue},8%,58%,1)`;
+    ctx.beginPath();
+    ctx.roundRect(m.x + dx, top, m.bw, h, Math.min(6, m.bw / 3, h / 2));
+    ctx.fill();
+    ctx.globalAlpha = 1;
   }
 
   private drawHitLine(top: number) {
@@ -467,8 +649,9 @@ export class Renderer {
         top0 = "#ff5d6c";
         bot = "#c2263a";
       } else if (burn > 0.2) {
-        top0 = `hsl(48,100%,${k.black ? 34 + burn * 28 : 82 + burn * 12}%)`;
-        bot = `hsl(16,100%,${k.black ? 18 + burn * 14 : 46 + burn * 8}%)`;
+        const hue = hitHue(useLook.getState().hitFx);
+        top0 = `hsl(${hue},100%,${k.black ? 32 + burn * 18 : 70 + burn * 12}%)`;
+        bot = `hsl(${hue + 16},90%,${k.black ? 20 + burn * 10 : 46 + burn * 6}%)`;
       } else if (held) {
         top0 = k.black ? stage.heldBlackTop : stage.heldWhiteTop;
         bot = k.black ? stage.heldBlackBot : stage.heldWhiteBot;

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { NOTE_THEMES, STAGES, useLook, type NoteTheme, type Stage } from "../lib/look";
+import { HIT_STYLES, MISS_STYLES, NOTE_THEMES, STAGES, useLook, type NoteTheme, type Stage } from "../lib/look";
 
 const chip = (hue: number, sat: number, light: number) => `hsl(${hue} ${sat}% ${light}%)`;
 
@@ -36,9 +36,13 @@ export function LookPanel() {
   const custom = useLook((s) => s.custom);
   const notes = useLook((s) => s.notes);
   const stage = useLook((s) => s.stage);
+  const hitFx = useLook((s) => s.hitFx);
+  const missFx = useLook((s) => s.missFx);
   const setNotes = useLook((s) => s.setNotes);
   const setStage = useLook((s) => s.setStage);
   const setCustom = useLook((s) => s.setCustom);
+  const setHitFx = useLook((s) => s.setHitFx);
+  const setMissFx = useLook((s) => s.setMissFx);
 
   useEffect(() => {
     if (!open) return;
@@ -175,6 +179,38 @@ export function LookPanel() {
               <span className="block text-[10px] font-medium uppercase tracking-wider text-white/40">{custom}</span>
             </span>
           </label>
+
+          <div className="mt-3.5 px-0.5 pb-2 text-[10px] font-semibold uppercase tracking-widest text-white/40">On time</div>
+          <div className="grid grid-cols-5 gap-1">
+            {HIT_STYLES.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setHitFx(p.id)}
+                className={`rounded-lg px-1 py-1.5 text-[10px] font-semibold transition ${
+                  p.id === hitFx ? "bg-cyan-400/20 text-cyan-100 ring-1 ring-cyan-300/50" : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                {p.name}
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-3.5 px-0.5 pb-2 text-[10px] font-semibold uppercase tracking-widest text-white/40">Missed</div>
+          <div className="grid grid-cols-5 gap-1">
+            {MISS_STYLES.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setMissFx(p.id)}
+                className={`rounded-lg px-1 py-1.5 text-[10px] font-semibold transition ${
+                  p.id === missFx ? "bg-white/14 text-white ring-1 ring-white/30" : "bg-white/5 text-white/60 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                {p.name}
+              </button>
+            ))}
+          </div>
         </div>,
         document.body,
       )}
