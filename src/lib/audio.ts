@@ -139,11 +139,24 @@ interface Voice {
   id: number;
   midi: number;
   live: boolean;
+  start: number;
   end: number;
   amp: GainNode;
   oscs: OscillatorNode[];
   release: number;
 }
+
+const CLIP = (() => {
+  const n = 2048;
+  const curve = new Float32Array(n);
+  const drive = 1.5;
+  const norm = Math.tanh(drive);
+  for (let i = 0; i < n; i++) {
+    const x = (i / (n - 1)) * 2 - 1;
+    curve[i] = Math.tanh(drive * x) / norm;
+  }
+  return curve;
+})();
 
 class Synth {
   private ctx: AudioContext | null = null;
@@ -155,14 +168,17 @@ class Synth {
     if (!this.ctx) {
       const ctx = new AudioContext({ latencyHint: "interactive" });
       const comp = ctx.createDynamicsCompressor();
-      comp.threshold.value = -18;
+      comp.threshold.value = -10;
       comp.knee.value = 12;
-      comp.ratio.value = 4;
-      comp.attack.value = 0.008;
-      comp.release.value = 0.12;
+      comp.ratio.value = 6;
+      comp.attack.value = 0.003;
+      comp.release.value = 0.2;
+      const shaper = ctx.createWaveShaper();
+      shaper.curve = CLIP;
+      shaper.oversample = "2x";
       this.master = ctx.createGain();
-      this.master.gain.value = 0.65;
-      this.master.connect(comp).connect(ctx.destination);
+      this.master.gain.value = 0.55;
+      this.master.connect(comp).connect(shaper).connect(ctx.destination);
       this.ctx = ctx;
     }
     if (this.ctx.state === "suspended") void this.ctx.resume();
@@ -191,46 +207,99 @@ class Synth {
     }
   }
 
+  /** Exponential when the change is real; a flat exponential ramp throws and clicks. */
+  private glide(param: AudioParam, from: number, to: number, time: number) {
+    const a = Math.max(from, SILENT);
+    const b = Math.max(to, SILENT);
+    if (b > a * 0.98 && b < a * 1.02) param.linearRampToValueAtTime(b, time);
+    else param.exponentialRampToValueAtTime(b, time);
+  }
+
+  private stopOscs(v: Voice, when: number) {
+    const t = Math.max(when, v.start);
+    for (const o of v.oscs) {
+      try {
+        o.stop(t);
+      } catch {
+        /* stop() can only be scheduled once */
+      }
+    }
+  }
+
+  private kill(v: Voice, time: number) {
+    v.live = false;
+    v.end = time;
+    try {
+      v.amp.gain.cancelScheduledValues(time);
+      v.amp.gain.setValueAtTime(SILENT, time);
+    } catch {
+      /* node already closed */
+    }
+    this.stopOscs(v, time);
+  }
+
   private fadeNow(v: Voice, rel: number) {
     if (!this.ctx) return;
     const time = this.ctx.currentTime;
+    if (v.start > time + 0.002) {
+      this.kill(v, time);
+      return;
+    }
     v.live = false;
     const g = v.amp.gain;
+    let held = SILENT;
     try {
       g.cancelAndHoldAtTime(time);
+      held = Math.max(g.value, SILENT);
     } catch {
       g.cancelScheduledValues(time);
-      g.setValueAtTime(Math.max(g.value, SILENT), time);
+      held = Math.max(g.value, SILENT);
+      g.setValueAtTime(held, time);
     }
-    g.exponentialRampToValueAtTime(SILENT, time + Math.max(rel, 0.03));
-    const stopAt = time + Math.max(rel, 0.03) + 0.04;
-    v.end = stopAt;
-    for (const o of v.oscs) {
+    const stopAt = time + Math.max(rel, 0.02);
+    try {
+      if (held <= SILENT * 2) g.linearRampToValueAtTime(SILENT, stopAt);
+      else g.exponentialRampToValueAtTime(SILENT, stopAt);
+    } catch {
       try {
-        o.stop(stopAt);
+        g.setValueAtTime(Math.max(held, SILENT), time);
+        g.linearRampToValueAtTime(SILENT, stopAt);
       } catch {
-        /* already stopped */
+        /* gain is already silent */
       }
+    }
+    v.end = stopAt + 0.03;
+    this.stopOscs(v, v.end);
+  }
+
+  /** A second voice on the same key beats against the first and crackles. Crossfade it out. */
+  private chokeSame(midi: number) {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const time = ctx.currentTime;
+    for (const v of this.voices) {
+      if (v.midi !== midi || v.end <= time) continue;
+      if (v.start > time + 0.002) this.kill(v, time);
+      else this.fadeNow(v, 0.018);
     }
   }
 
   noteOn(midi: number, velocity = 0.8, sustainSec?: number) {
     const ctx = this.ensure();
     if (ctx.state !== "running") console.warn("[midi] audio context", ctx.state);
+    this.chokeSame(midi);
     this.prune();
     const patch = this.patchFor(midi);
-    const now = ctx.currentTime;
     const freq = 440 * 2 ** ((midi - 69) / 12);
     const { env } = patch;
     const attack = Math.max(env.a, 0.008);
-    const peak = patch.gain * (0.3 + 0.7 * velocity) * (patch.group === "keys" ? 1.15 - midi / 140 : 1);
+    const decay = Math.max(env.d, 0.02);
+    const release = Math.max(env.r, 0.05);
+    const peak = Math.max(patch.gain * (0.3 + 0.7 * velocity) * (patch.group === "keys" ? 1.15 - midi / 140 : 1), SILENT * 8);
     const sus = Math.max(peak * env.s, SILENT);
 
     const amp = ctx.createGain();
-    amp.gain.setValueAtTime(SILENT, now);
-    amp.gain.linearRampToValueAtTime(Math.max(peak, SILENT), now + attack);
-    amp.gain.exponentialRampToValueAtTime(sus, now + attack + Math.max(env.d, 0.02));
-
+    amp.gain.value = SILENT;
     let out: AudioNode = amp;
     const oscs: OscillatorNode[] = [];
     if (patch.tremolo) {
@@ -241,7 +310,6 @@ class Synth {
       lfo.frequency.value = patch.tremolo.rate;
       lfoGain.gain.value = patch.tremolo.depth / 2;
       lfo.connect(lfoGain).connect(trem.gain);
-      lfo.start(now);
       oscs.push(lfo);
       amp.connect(trem);
       out = trem;
@@ -257,8 +325,11 @@ class Synth {
       const min = f.min ?? 200;
       const start = Math.min(12000, Math.max(min, freq * f.start));
       const end = Math.min(12000, Math.max(min, freq * f.end));
-      lp.frequency.setValueAtTime(start, now);
-      if (Math.abs(end - start) > 1) lp.frequency.exponentialRampToValueAtTime(end, now + Math.max(f.time, 0.02));
+      lp.frequency.value = start;
+      if (Math.abs(end - start) > 1) {
+        const sweep = Math.max(f.time, 0.02);
+        lp.frequency.exponentialRampToValueAtTime(Math.max(end, 1), ctx.currentTime + sweep);
+      }
       lp.connect(amp);
       input = lp;
     }
@@ -267,11 +338,11 @@ class Synth {
     if (patch.fm) {
       const mod = ctx.createOscillator();
       modGain = ctx.createGain();
+      const depth = freq * patch.fm.index;
       mod.frequency.value = freq * patch.fm.ratio;
-      modGain.gain.setValueAtTime(freq * patch.fm.index, now);
-      modGain.gain.exponentialRampToValueAtTime(Math.max(freq * patch.fm.index * 0.04, SILENT), now + patch.fm.decay);
+      modGain.gain.value = depth;
+      modGain.gain.exponentialRampToValueAtTime(Math.max(depth * 0.04, SILENT), ctx.currentTime + Math.max(patch.fm.decay, 0.02));
       mod.connect(modGain);
-      mod.start(now);
       oscs.push(mod);
     }
     for (const spec of patch.oscs) {
@@ -283,29 +354,45 @@ class Synth {
       g.gain.value = spec.amp;
       if (modGain) modGain.connect(o.frequency);
       o.connect(g).connect(input);
-      o.start(now);
       oscs.push(o);
     }
 
-    const release = Math.max(env.r, 0.05);
-    const v: Voice = { id: this.nextId++, midi, live: true, end: now + 30, amp, oscs, release };
-    this.voices.push(v);
-
+    const now = ctx.currentTime + 0.01;
+    amp.gain.setValueAtTime(SILENT, now);
+    amp.gain.linearRampToValueAtTime(peak, now + attack);
+    const decayEnd = now + attack + decay;
+    let stopAt = now + 30;
+    let live = true;
     if (sustainSec !== undefined) {
-      const relAt = now + Math.max(sustainSec, attack + 0.03);
-      amp.gain.setValueAtTime(sus, relAt);
-      amp.gain.exponentialRampToValueAtTime(SILENT, relAt + release);
-      const stopAt = relAt + release + 0.05;
-      v.live = false;
-      v.end = stopAt;
-      for (const o of oscs) o.stop(stopAt);
+      const want = now + Math.max(sustainSec, attack + 0.03);
+      if (want < decayEnd - 0.004) {
+        const u = Math.min(1, Math.max(0.001, (want - (now + attack)) / decay));
+        const mid = Math.max(peak * (sus / peak) ** u, SILENT);
+        const rel = Math.max(want, now + attack + 0.004);
+        this.glide(amp.gain, peak, mid, rel);
+        this.glide(amp.gain, mid, SILENT, rel + release);
+        stopAt = rel + release + 0.05;
+      } else {
+        this.glide(amp.gain, peak, sus, decayEnd);
+        const relAt = Math.max(want, decayEnd + 0.004);
+        amp.gain.linearRampToValueAtTime(sus, relAt);
+        this.glide(amp.gain, sus, SILENT, relAt + release);
+        stopAt = relAt + release + 0.05;
+      }
+      live = false;
     } else if (env.tail > 0) {
-      amp.gain.exponentialRampToValueAtTime(SILENT, now + attack + env.d + env.tail);
-      const stopAt = now + attack + env.d + env.tail + 0.05;
-      v.live = false;
-      v.end = stopAt;
-      for (const o of oscs) o.stop(stopAt);
+      this.glide(amp.gain, peak, sus, decayEnd);
+      this.glide(amp.gain, sus, SILENT, decayEnd + env.tail);
+      stopAt = decayEnd + env.tail + 0.05;
+      live = false;
+    } else {
+      this.glide(amp.gain, peak, sus, decayEnd);
     }
+
+    for (const o of oscs) o.start(now);
+    const v: Voice = { id: this.nextId++, midi, live, start: now, end: stopAt, amp, oscs, release };
+    if (!live) this.stopOscs(v, stopAt);
+    this.voices.push(v);
   }
 
   noteOff(midi: number) {
@@ -330,16 +417,17 @@ class Synth {
 
   click(accent: boolean) {
     const ctx = this.ensure();
-    const now = ctx.currentTime;
     const o = ctx.createOscillator();
     const g = ctx.createGain();
     o.frequency.value = accent ? 1568 : 1046;
-    g.gain.setValueAtTime(SILENT, now);
-    g.gain.linearRampToValueAtTime(0.18, now + 0.004);
-    g.gain.exponentialRampToValueAtTime(SILENT, now + 0.06);
+    g.gain.value = SILENT;
     o.connect(g).connect(this.master);
+    const now = ctx.currentTime + 0.005;
+    g.gain.setValueAtTime(SILENT, now);
+    g.gain.linearRampToValueAtTime(0.12, now + 0.003);
+    g.gain.exponentialRampToValueAtTime(SILENT, now + 0.05);
     o.start(now);
-    o.stop(now + 0.08);
+    o.stop(now + 0.07);
   }
 }
 
