@@ -186,6 +186,8 @@ class Synth {
     while (this.voices.length > MAX_VOICES) {
       const oldest = this.voices.find((v) => !v.live) ?? this.voices[0];
       this.fadeNow(oldest, 0.04);
+      const i = this.voices.indexOf(oldest);
+      if (i >= 0) this.voices.splice(i, 1);
     }
   }
 

@@ -3,7 +3,7 @@ import { DEMO_SONG, type Hand, type Song } from "./song";
 import { synth } from "./audio";
 import { onNote, type NoteEvent } from "./midi";
 
-export type Mode = "wait" | "play";
+export type Mode = "wait" | "play" | "echo";
 
 export const HIT_WINDOW_SEC = 0.2;
 export const PERFECT_WINDOW_SEC = 0.07;
@@ -69,6 +69,7 @@ class Engine {
   wrong = new Map<number, number>();
   fx: HitFx[] = [];
   judgement: { text: string; at: number; good: boolean } | null = null;
+  echoPhase: "call" | "reply" = "call";
 
   private scanIdx = 0;
   private audioIdx = 0;
@@ -83,7 +84,14 @@ class Engine {
     onNote((e, on) => this.handleNote(e, on));
     useEngine.subscribe((s, prev) => {
       if (s.song !== prev.song) this.loadSong(s.song);
-      else if (s.mode !== prev.mode || s.hands !== prev.hands) this.reset(this.pos);
+      else if (s.mode !== prev.mode || s.hands !== prev.hands) {
+        this.echoPhase = "call";
+        if (s.mode === "echo") {
+          const { a } = this.phraseBounds(Math.max(0, this.pos));
+          this.pos = a;
+        }
+        this.reset(this.pos);
+      }
       if (s.playing !== prev.playing) {
         if (s.playing) this.onPlay();
         else synth.allOff();
@@ -98,6 +106,7 @@ class Engine {
   private loadSong(song: Song) {
     this.status = new Uint8Array(song.notes.length);
     this.stats = { ...freshStats };
+    this.echoPhase = "call";
     this.pos = 0;
     this.reset(0);
     this.flush(true);
@@ -112,18 +121,21 @@ class Engine {
     return (this.s.song.bpm * this.s.speed) / 60;
   }
 
-  reset(beat: number) {
+  reset(beat: number, cutSound = true) {
     const { song } = this.s;
     const from = lowerBound(song, beat - 1e-6);
     this.status.fill(PENDING, from);
     this.scanIdx = from;
     this.audioIdx = from;
-    synth.allOff();
+    if (cutSound) synth.allOff();
   }
 
   seek(beat: number) {
-    const { song } = this.s;
-    this.pos = Math.max(0, Math.min(song.length, beat));
+    const { song, mode } = this.s;
+    let pos = Math.max(0, Math.min(song.length, beat));
+    this.echoPhase = "call";
+    if (mode === "echo") pos = this.phraseBounds(pos).a;
+    this.pos = pos;
     this.reset(this.pos);
     const wasFinished = this.stats.finished;
     this.stats.finished = false;
@@ -170,7 +182,7 @@ class Engine {
 
     const { notes } = s.song;
     const bps = this.beatsPerSec;
-    if (s.mode === "wait") {
+    if (s.mode === "wait" || (s.mode === "echo" && this.echoPhase === "reply")) {
       const gi = this.nextPendingIdx();
       if (gi >= notes.length) return;
       const g = notes[gi];
@@ -181,8 +193,10 @@ class Engine {
       if (match < 0) return this.markWrong(e.midi);
       if (g.start - this.pos > 1) return;
       this.markHit(match, true);
+      if (s.mode === "echo" && this.phraseDone()) this.advanceEcho();
       return;
     }
+    if (s.mode === "echo") return;
 
     const posAtEvent = this.pos + ((performance.now() - this.lastTickAt) / 1000) * bps;
     const win = HIT_WINDOW_SEC * bps;
@@ -217,6 +231,65 @@ class Engine {
     this.dirty = true;
   }
 
+  /** Two-bar slices of the song or the active loop. A leftover of one bar or less stays on the previous slice, so the last phrase is at most three bars. */
+  private phraseBounds(beat: number) {
+    const s = this.s;
+    const bpb = s.song.beatsPerBar;
+    const origin = s.loop?.a ?? 0;
+    const end = Math.max(origin + bpb, s.loop?.b ?? s.song.length);
+    const size = 2 * bpb;
+    const span = end - origin;
+    if (span <= size + bpb) return { a: origin, b: end };
+    const rem = span % size;
+    const absorb = rem > 1e-6 && rem <= bpb + 1e-6;
+    const body = absorb ? span - rem : span;
+    const rel = Math.min(Math.max(0, beat - origin), span - 1e-9);
+    const lastStart = body - size;
+    const aRel = absorb && rel >= lastStart ? lastStart : Math.floor(rel / size) * size;
+    const a = origin + aRel;
+    const b = absorb && aRel === lastStart ? end : Math.min(end, a + size);
+    return { a, b };
+  }
+
+  private phraseDone() {
+    const { a, b } = this.phraseBounds(this.pos);
+    const { notes } = this.s.song;
+    for (let i = lowerBound(this.s.song, a - 1e-6); i < notes.length && notes[i].start < b - 1e-4; i++) {
+      if (this.isRequired(i) && this.status[i] !== HIT) return false;
+    }
+    return true;
+  }
+
+  private beginReply(at: number) {
+    this.echoPhase = "reply";
+    this.pos = at;
+    this.reset(at, false);
+    this.dirty = true;
+  }
+
+  private beginCall(at: number) {
+    this.echoPhase = "call";
+    this.pos = at;
+    this.reset(at);
+    this.dirty = true;
+  }
+
+  private advanceEcho() {
+    const { b } = this.phraseBounds(this.pos);
+    const end = this.s.loop?.b ?? this.s.song.length;
+    if (b >= end - 1e-4) {
+      if (this.s.loop) {
+        this.beginCall(this.s.loop.a);
+        return;
+      }
+      this.stats.finished = true;
+      this.flush(true);
+      useEngine.setState({ playing: false });
+      return;
+    }
+    this.beginCall(b);
+  }
+
   private markWrong(midi: number) {
     this.stats.wrongs++;
     this.stats.streak = 0;
@@ -247,12 +320,27 @@ class Engine {
     const prev = this.pos;
     let next = prev + dt * bps;
 
-    if (s.mode === "wait") {
+    let replyAt: number | null = null;
+    if (s.mode === "echo" && prev >= (s.loop?.a ?? 0) - 1e-6) {
+      const { a, b } = this.phraseBounds(this.pos);
+      if (this.echoPhase === "reply") {
+        if (this.phraseDone()) {
+          this.advanceEcho();
+          this.flush(true);
+          return;
+        }
+        const gi = this.nextPendingIdx();
+        if (gi < notes.length && notes[gi].start < b && next > notes[gi].start) next = Math.max(prev, notes[gi].start);
+      } else if (next >= b) {
+        next = Math.max(prev, b - 1e-4);
+        replyAt = a;
+      }
+    } else if (s.mode === "wait") {
       const gi = this.nextPendingIdx();
       if (gi < notes.length && next > notes[gi].start) next = Math.max(prev, notes[gi].start);
     }
 
-    if (s.loop && next >= s.loop.b) {
+    if (s.mode !== "echo" && s.loop && next >= s.loop.b) {
       this.pos = s.loop.a;
       this.reset(this.pos);
       this.flush(true);
@@ -280,10 +368,16 @@ class Engine {
       }
     }
 
+    const hearScore = s.mode === "echo" ? this.echoPhase === "call" : s.appSound;
     while (this.audioIdx < notes.length && notes[this.audioIdx].start <= next) {
       const n = notes[this.audioIdx++];
       const idx = this.audioIdx - 1;
-      if (s.appSound) synth.noteOn(n.midi, (n.vel ?? 0.7) * (this.isRequired(idx) ? 0.4 : 0.85), n.dur / bps);
+      if (hearScore) synth.noteOn(n.midi, (n.vel ?? 0.7) * (this.isRequired(idx) ? 0.4 : 0.85), n.dur / bps);
+    }
+    if (replyAt !== null) {
+      this.beginReply(replyAt);
+      this.flush(true);
+      return;
     }
 
     if (next >= s.song.length + 0.5) {

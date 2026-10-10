@@ -246,6 +246,7 @@ export class Renderer {
     this.spawnParticles(top);
     this.drawParticles(top);
     this.drawKeyboard(top, sounding, now);
+    this.drawEchoCue(top, s.mode, s.finished, s.loop?.a ?? 0);
     this.drawJudgement(top, now);
     if (pos < 0) this.drawCountIn(top);
   }
@@ -343,6 +344,18 @@ export class Renderer {
     line.addColorStop(1, "#f472b6");
     ctx.fillStyle = line;
     ctx.fillRect(0, top, this.w, 2.5);
+  }
+
+  private drawEchoCue(top: number, mode: string, finished: boolean, origin: number) {
+    if (mode !== "echo" || finished || engine.pos < origin) return;
+    const ctx = this.ctx;
+    const reply = engine.echoPhase === "reply";
+    ctx.globalAlpha = 0.92;
+    ctx.fillStyle = reply ? "#fde68a" : "#a5f3fc";
+    ctx.font = "700 16px Inter, system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(reply ? "Your turn" : "Listen", this.w / 2, top - 56);
+    ctx.globalAlpha = 1;
   }
 
   private drawJudgement(top: number, now: number) {

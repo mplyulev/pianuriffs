@@ -53,7 +53,11 @@ function Progress() {
 export function Controls() {
   const s = useEngine();
   const set = useEngine.setState;
-  const modes: [Mode, string][] = [["play", "Play along"], ["wait", "Wait"]];
+  const modes: [Mode, string, string][] = [
+    ["play", "Play along", "Play with the scrolling notes"],
+    ["wait", "Wait", "Notes wait until you play them"],
+    ["echo", "Call & response", "The app plays two bars, then you play them back"],
+  ];
   const barBeats = s.song.beatsPerBar;
   const [hover, setHoverState] = useState(false);
   const closeTimer = useRef<number>(0);
@@ -155,8 +159,8 @@ export function Controls() {
         </div>
 
         <Group label="Mode">
-          {modes.map(([m, l]) => (
-            <Pill key={m} active={s.mode === m} onClick={() => set({ mode: m })}>{l}</Pill>
+          {modes.map(([m, l, hint]) => (
+            <Pill key={m} active={s.mode === m} title={hint} onClick={() => set({ mode: m })}>{l}</Pill>
           ))}
         </Group>
 
