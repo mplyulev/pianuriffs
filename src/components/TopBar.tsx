@@ -21,7 +21,8 @@ export function TopBar() {
   useEffect(() => {
     const onMove = (e: PointerEvent) => {
       const inside = barRef.current?.contains(e.target as Node) ?? false;
-      setHover(inside || e.clientY < 28);
+      const soundsOpen = document.body.dataset.sounds === "open";
+      setHover(inside || e.clientY < 28 || soundsOpen);
     };
     window.addEventListener("pointermove", onMove);
     return () => window.removeEventListener("pointermove", onMove);

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { PATCHES, synth, useSound } from "../lib/audio";
 
 const NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
@@ -10,7 +11,9 @@ const select =
 export function SoundPanel() {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
   const leaveTimer = useRef(0);
+  const [box, setBox] = useState<{ top: number; right: number } | null>(null);
   const s = useSound();
   const set = (patch: Partial<typeof s>) => {
     useSound.setState(patch);
@@ -21,7 +24,9 @@ export function SoundPanel() {
   useEffect(() => {
     if (!open) return;
     const onDown = (e: PointerEvent) => {
-      if (!root.current?.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (root.current?.contains(t) || panel.current?.contains(t)) return;
+      setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
@@ -34,11 +39,35 @@ export function SoundPanel() {
     };
   }, [open]);
 
+  useEffect(() => {
+    document.body.dataset.sounds = open ? "open" : "";
+    return () => {
+      document.body.dataset.sounds = "";
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const r = root.current?.getBoundingClientRect();
+      if (!r || r.height < 2) return;
+      const next = { top: r.bottom + 10, right: Math.max(12, window.innerWidth - r.right) };
+      setBox((prev) => (prev && Math.abs(prev.top - next.top) < 0.5 && Math.abs(prev.right - next.right) < 0.5 ? prev : next));
+    };
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("pointermove", place);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("pointermove", place);
+    };
+  }, [open]);
+
   const scheduleClose = () => {
     window.clearTimeout(leaveTimer.current);
     leaveTimer.current = window.setTimeout(() => {
       const el = document.activeElement;
-      if (el && root.current?.contains(el) && el.tagName === "SELECT") return;
+      if (el && panel.current?.contains(el) && (el.tagName === "SELECT" || el.tagName === "INPUT")) return;
       setOpen(false);
     }, 220);
   };
@@ -59,8 +88,14 @@ export function SoundPanel() {
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M4 8v8M9 4v16M14 7v10M19 10v4" /></svg>
         Sounds
       </button>
-      {open && (
-        <div className="glass absolute right-0 top-[calc(100%+10px)] z-30 w-72 space-y-4 rounded-2xl p-4">
+      {open && box && createPortal(
+        <div
+          ref={panel}
+          className="glass fixed z-[80] w-72 space-y-4 rounded-2xl p-4"
+          style={{ top: box.top, right: box.right }}
+          onMouseEnter={() => window.clearTimeout(leaveTimer.current)}
+          onMouseLeave={scheduleClose}
+        >
           <label className="block space-y-1.5">
             <span className="text-[10px] font-semibold uppercase tracking-widest text-white/40">Keys instrument</span>
             <select className={select} value={s.keys} onChange={(e) => set({ keys: e.target.value })}>
@@ -95,7 +130,8 @@ export function SoundPanel() {
           <p className="text-[11px] leading-relaxed text-white/40">
             Applies to your playing and the app's backing. Notes below the split use the bass sound.
           </p>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
