@@ -5,7 +5,6 @@ import { useEngine } from "./lib/engine";
 import { synth } from "./lib/audio";
 import { TopBar } from "./components/TopBar";
 import { Controls } from "./components/Controls";
-import { Stats } from "./components/Stats";
 import { Results } from "./components/Results";
 import { Library } from "./components/Library";
 import { Welcome } from "./components/Welcome";
@@ -50,12 +49,11 @@ export default function App() {
       <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-3 sm:p-4">
         <div className="flex flex-col gap-3">
           <TopBar />
-          <div className="flex items-start gap-3">
-            {!welcome && sponsor && <SponsorCard slot="dock" onDismiss={() => setSponsor(false)} />}
-            <div className="ml-auto">
-              <Stats />
+          {!welcome && sponsor && (
+            <div className="flex">
+              <SponsorCard slot="dock" onDismiss={() => setSponsor(false)} />
             </div>
-          </div>
+          )}
         </div>
       </div>
       <Controls />
