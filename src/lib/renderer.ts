@@ -316,7 +316,7 @@ export class Renderer {
     this.drawHitFx(top, now, stage.light);
     this.drawMissFx(top, now);
     this.drawHitLine(top);
-    this.drawEchoCue(top, s.mode, s.finished, s.loop?.a ?? 0);
+    this.drawEchoCue(top, s.mode, s.finished, s.loop?.a ?? 0, now);
     this.drawJudgement(top, now);
     if (pos < 0) this.drawCountIn(top);
   }
@@ -681,8 +681,12 @@ export class Renderer {
     for (const [m, k] of this.keys) if (k.black) paint(m, k);
   }
 
-  private drawEchoCue(top: number, mode: string, finished: boolean, origin: number) {
+  private drawEchoCue(top: number, mode: string, finished: boolean, origin: number, now: number) {
     if (mode !== "echo" || finished || engine.pos < origin) return;
+    if (engine.echoPhase === "next") {
+      this.drawNextPart(top, now);
+      return;
+    }
     const ctx = this.ctx;
     const reply = engine.echoPhase === "reply";
     const light = useLook.getState().stage.light;
@@ -692,6 +696,55 @@ export class Renderer {
     ctx.textAlign = "center";
     ctx.fillText(reply ? "Your turn" : "Listen", this.w / 2, top - 56);
     ctx.globalAlpha = 1;
+  }
+
+  private drawNextPart(top: number, now: number) {
+    const ctx = this.ctx;
+    const light = useLook.getState().stage.light;
+    const t = now / 1000;
+    const pulse = 0.5 + 0.5 * Math.sin(t * 4.2);
+    const cx = this.w / 2;
+    const cy = top * 0.42 + Math.sin(t * 2.1) * 5;
+
+    ctx.fillStyle = light ? "rgba(255,250,242,0.62)" : "rgba(4,8,16,0.5)";
+    ctx.fillRect(0, 0, this.w, top);
+
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 3; i++) {
+      const u = (t * 0.42 + i / 3) % 1;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 36 + u * 108, 0, Math.PI * 2);
+      ctx.strokeStyle = light ? `rgba(15,118,110,${(1 - u) * 0.4})` : `rgba(165,243,252,${(1 - u) * 0.5})`;
+      ctx.stroke();
+    }
+
+    const bw = Math.min(300, this.w - 40);
+    const bh = 104;
+    ctx.fillStyle = light ? "rgba(255,252,247,0.96)" : "rgba(10,14,26,0.9)";
+    ctx.beginPath();
+    ctx.roundRect(cx - bw / 2, cy - bh / 2, bw, bh, 20);
+    ctx.fill();
+    ctx.strokeStyle = light ? "rgba(15,118,110,0.35)" : "rgba(165,243,252,0.45)";
+    ctx.stroke();
+
+    ctx.save();
+    ctx.translate(cx, cy - 14);
+    ctx.scale(1 + pulse * 0.04, 1 + pulse * 0.04);
+    ctx.fillStyle = light ? "#134e4a" : "#ecfeff";
+    ctx.font = "800 30px Inter, system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("Next part", 0, 0);
+    ctx.restore();
+
+    ctx.globalAlpha = 0.7 + pulse * 0.3;
+    ctx.fillStyle = light ? "#0f766e" : "#a5f3fc";
+    ctx.font = "600 14px Inter, system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("Press Space or Enter", cx, cy + 24);
+    ctx.globalAlpha = 1;
+    ctx.textBaseline = "alphabetic";
   }
 
   private drawJudgement(top: number, now: number) {

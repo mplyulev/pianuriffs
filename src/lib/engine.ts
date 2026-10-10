@@ -71,7 +71,7 @@ class Engine {
   wrong = new Map<number, number>();
   fx: HitFx[] = [];
   judgement: { text: string; at: number; good: boolean } | null = null;
-  echoPhase: "call" | "reply" = "call";
+  echoPhase: "call" | "reply" | "next" = "call";
 
   private scanIdx = 0;
   private audioIdx = 0;
@@ -195,7 +195,7 @@ class Engine {
       if (match < 0) return this.markWrong(e.midi);
       if (g.start - this.pos > 1) return;
       this.markHit(match, true);
-      if (s.mode === "echo" && this.phraseDone()) this.advanceEcho();
+      if (s.mode === "echo" && this.phraseDone()) this.holdForNext();
       return;
     }
     if (s.mode === "echo") return;
@@ -281,7 +281,7 @@ class Engine {
     const end = this.s.loop?.b ?? this.s.song.length;
     if (b >= end - 1e-4) {
       if (this.s.loop) {
-        this.beginCall(this.s.loop.a);
+        this.parkNext(this.s.loop.a);
         return;
       }
       this.stats.finished = true;
@@ -289,7 +289,31 @@ class Engine {
       useEngine.setState({ playing: false });
       return;
     }
-    this.beginCall(b);
+    this.parkNext(b);
+  }
+
+  /** Phrase is done. Park on the next one and wait for Space or Enter. */
+  private holdForNext() {
+    if (this.echoPhase === "next" || this.stats.finished) return;
+    this.advanceEcho();
+  }
+
+  private parkNext(at: number) {
+    this.echoPhase = "next";
+    this.pos = at;
+    this.reset(at);
+    this.dirty = true;
+    this.flush(true);
+  }
+
+  /** Start the parked phrase. Returns true when Space or Enter was consumed. */
+  confirmEcho(): boolean {
+    if (this.echoPhase !== "next" || this.s.mode !== "echo" || this.stats.finished) return false;
+    const at = this.pos;
+    if (!this.s.playing) useEngine.setState({ playing: true });
+    this.beginCall(at);
+    this.flush(true);
+    return true;
   }
 
   private markWrong(midi: number) {
@@ -317,6 +341,10 @@ class Engine {
       this.flush();
       return;
     }
+    if (s.mode === "echo" && this.echoPhase === "next") {
+      this.flush();
+      return;
+    }
     const { notes } = s.song;
     const bps = this.beatsPerSec;
     const prev = this.pos;
@@ -327,8 +355,7 @@ class Engine {
       const { a, b } = this.phraseBounds(this.pos);
       if (this.echoPhase === "reply") {
         if (this.phraseDone()) {
-          this.advanceEcho();
-          this.flush(true);
+          this.holdForNext();
           return;
         }
         const gi = this.nextPendingIdx();

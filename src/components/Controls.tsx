@@ -56,7 +56,7 @@ export function Controls() {
   const modes: [Mode, string, string][] = [
     ["play", "Play along", "Play with the scrolling notes"],
     ["wait", "Wait", "Notes wait until you play them"],
-    ["echo", "Call & response", "The app plays two bars, then you play them back"],
+    ["echo", "Call & response", "The app plays two bars, then you play them back. Space starts the next part"],
   ];
   const barBeats = s.song.beatsPerBar;
   const [hover, setHoverState] = useState(false);

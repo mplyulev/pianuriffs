@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Renderer } from "./lib/renderer";
 import { connectMidi, installComputerKeyboard } from "./lib/midi";
-import { useEngine } from "./lib/engine";
+import { engine, useEngine } from "./lib/engine";
 import { synth } from "./lib/audio";
 import { TopBar } from "./components/TopBar";
 import { Controls } from "./components/Controls";
@@ -20,7 +20,15 @@ export default function App() {
     void connectMidi();
     const off = installComputerKeyboard();
     const key = (e: KeyboardEvent) => {
-      if (e.code === "Space" && (e.target as HTMLElement).tagName !== "BUTTON") {
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (!e.repeat && (e.code === "Space" || e.code === "Enter") && engine.confirmEcho()) {
+        e.preventDefault();
+        synth.unlock();
+        void connectMidi();
+        return;
+      }
+      if (e.code === "Space" && tag !== "BUTTON") {
         e.preventDefault();
         synth.unlock();
         void connectMidi();
