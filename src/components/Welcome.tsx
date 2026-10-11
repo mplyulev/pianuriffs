@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { selectSong } from "../lib/engine";
+import { dailyPick } from "../lib/library";
 import { useMidi } from "../lib/midi";
 import { CoffeeButton } from "./CoffeeButton";
 import { Logo } from "./Logo";
@@ -18,6 +20,7 @@ export function Welcome({ onEnter }: { onEnter: () => void }) {
     };
   }, []);
 
+  const daily = useMemo(() => dailyPick(), []);
   const settled = !midi.supported || midi.status !== "idle";
   const canEnter = forced || (minTime && settled);
   const connected = midi.inputs.length > 0;
@@ -50,7 +53,26 @@ export function Welcome({ onEnter }: { onEnter: () => void }) {
               <span>{status}</span>
             </div>
 
-            <div className="mt-6 flex flex-col gap-2">
+            <button
+              type="button"
+              disabled={!canEnter}
+              onClick={() => {
+                selectSong(daily.song);
+                onEnter();
+              }}
+              className="mt-5 flex w-full cursor-pointer items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-left transition hover:bg-white/10 disabled:cursor-pointer disabled:opacity-50"
+            >
+              <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br ${daily.category.accent} text-[10px] font-bold text-slate-900`}>
+                Today
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[10px] font-semibold uppercase tracking-widest text-white/40">Daily riff</span>
+                <span className="block truncate text-sm font-semibold text-white">{daily.song.title}</span>
+                <span className="block truncate text-xs text-white/45">{daily.category.name} · {daily.song.bpm} BPM</span>
+              </span>
+            </button>
+
+            <div className="mt-4 flex flex-col gap-2">
               <button
                 type="button"
                 disabled={!canEnter}

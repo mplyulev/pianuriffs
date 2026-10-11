@@ -26,10 +26,10 @@ function Progress() {
   }, [song]);
 
   return (
-    <div className="flex items-center gap-3 pr-6">
-      <span ref={label} className="w-24 text-xs font-medium tabular-nums text-white/50" />
+    <div className="flex min-w-0 flex-1 items-center gap-3">
+      <span ref={label} className="hidden w-24 shrink-0 text-xs font-medium tabular-nums text-white/50 sm:block" />
       <div
-        className="group relative h-6 flex-1 cursor-pointer"
+        className="group relative h-6 min-w-0 flex-1 cursor-pointer"
         onPointerDown={(e) => {
           const r = e.currentTarget.getBoundingClientRect();
           engine.seek(((e.clientX - r.left) / r.width) * song.length);
@@ -67,7 +67,18 @@ export function Controls() {
     else closeTimer.current = window.setTimeout(() => setHoverState(false), delay);
   }, []);
   const [minimized, setMinimized] = useState(false);
+  const [practice, setPractice] = useState(false);
+  const practiceRef = useRef<HTMLDivElement>(null);
   const collapsed = !hover && (s.playing || minimized);
+
+  useEffect(() => {
+    if (!practice) return;
+    const onDown = (e: PointerEvent) => {
+      if (!practiceRef.current?.contains(e.target as Node)) setPractice(false);
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [practice]);
 
   const toggleHand = (h: "L" | "R") => {
     const next = { ...s.hands, [h]: !s.hands[h] };
@@ -91,7 +102,7 @@ export function Controls() {
       className="pointer-events-none absolute inset-x-0 bottom-[var(--keyh,150px)] flex justify-center px-3 pb-3 sm:px-4"
     >
       <div
-        className={`pointer-events-auto w-full max-w-5xl ${collapsed ? "" : "pt-7"}`}
+        className={`pointer-events-auto w-full max-w-5xl ${collapsed ? "" : "pt-4"}`}
         onMouseEnter={() => setHover(true)}
         onMouseLeave={() => setHover(false, 350)}
       >
@@ -101,74 +112,56 @@ export function Controls() {
           }`}
         >
           <div className="overflow-hidden">
-            <div className="glass relative flex flex-col gap-3 rounded-2xl p-4">
+            <div className="glass relative flex flex-col gap-2.5 rounded-2xl px-3 py-3 sm:px-4">
       <button
         onClick={() => {
           setMinimized(true);
           setHover(false);
+          setPractice(false);
         }}
         className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full text-white/40 transition hover:bg-white/12 hover:text-white"
         title="Minimize"
       >
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
       </button>
-      <Progress />
-      <div className="flex flex-wrap items-end justify-between gap-x-5 gap-y-3">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => {
-              synth.unlock();
-              if (!s.playing) setHover(false);
-              set({ playing: !s.playing });
-            }}
-            className="grid h-12 w-12 place-items-center rounded-full bg-gradient-to-br from-cyan-400 to-indigo-500 text-white shadow-lg shadow-indigo-500/40 transition hover:scale-105 active:scale-95"
-            title="Play / pause (Space)"
-          >
-            {s.playing ? (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
-            ) : (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5z" /></svg>
-            )}
-          </button>
-          <button
-            onClick={() => {
-              set({ playing: false });
-              engine.restart();
-            }}
-            className="grid h-9 w-9 place-items-center rounded-full bg-white/8 text-white/70 hover:bg-white/15"
-            title="Stop and restart"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /></svg>
-          </button>
-          <button
-            onClick={() => set({ appSound: !s.appSound })}
-            className={`grid h-9 w-9 place-items-center rounded-full transition ${
-              s.appSound ? "bg-white/8 text-white/70 hover:bg-white/15" : "bg-rose-500/20 text-rose-200 ring-1 ring-rose-400/50"
-            }`}
-            title={s.appSound ? "App playback sound on (click to mute)" : "App playback sound off"}
-          >
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M11 5L6 9H3v6h3l5 4V5z" />
-              {s.appSound ? (
-                <path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" />
-              ) : (
-                <path d="M16 9l6 6M22 9l-6 6" />
-              )}
-            </svg>
-          </button>
-        </div>
-
+      <div className="flex flex-wrap items-center gap-2 pr-6 sm:gap-3">
+        <button
+          onClick={() => {
+            synth.unlock();
+            if (!s.playing) setHover(false);
+            set({ playing: !s.playing });
+          }}
+          className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-gradient-to-br from-cyan-400 to-indigo-500 text-white shadow-lg shadow-indigo-500/40 transition hover:scale-105 active:scale-95"
+          title="Play / pause (Space)"
+        >
+          {s.playing ? (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
+          ) : (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5z" /></svg>
+          )}
+        </button>
+        <button
+          onClick={() => {
+            set({ playing: false });
+            engine.restart();
+          }}
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/8 text-white/70 hover:bg-white/15"
+          title="Stop and restart"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /></svg>
+        </button>
+        <Progress />
+      </div>
+      <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
         <Group label="Mode">
           {modes.map(([m, l, hint]) => (
             <Pill key={m} active={s.mode === m} title={hint} onClick={() => set({ mode: m })}>{l}</Pill>
           ))}
         </Group>
-
-        <Group label="Hands you play">
+        <Group label="Hands">
           <Pill tone="pink" active={s.hands.L} title="Left hand. Off dims these notes and mutes them" onClick={() => toggleHand("L")}>Left</Pill>
           <Pill tone="cyan" active={s.hands.R} title="Right hand. Off dims these notes and mutes them" onClick={() => toggleHand("R")}>Right</Pill>
         </Group>
-
         <div className="flex flex-col gap-1">
           <span className="px-1 text-[10px] font-semibold uppercase tracking-widest text-white/35">
             Tempo · {Math.round(s.song.bpm * s.speed)} BPM
@@ -177,24 +170,35 @@ export function Controls() {
             <input
               type="range" min={0.25} max={1.25} step={0.05} value={s.speed}
               onChange={(e) => set({ speed: Number(e.target.value) })}
-              className="w-32"
+              className="w-28 sm:w-32"
             />
             <span className="w-9 text-xs font-semibold tabular-nums text-white/70">{Math.round(s.speed * 100)}%</span>
           </div>
         </div>
-
-        <Group label="Practice">
-          <Pill tone="amber" active={s.metronome} onClick={() => set({ metronome: !s.metronome })}>Metronome</Pill>
-          <Pill tone="amber" active={s.countIn} onClick={() => set({ countIn: !s.countIn })}>Count-in</Pill>
-        </Group>
-
-        <Group label="Loop">
-          <Pill onClick={() => setLoopEdge("a")} title="Set loop start to current bar">A</Pill>
-          <Pill onClick={() => setLoopEdge("b")} title="Set loop end to current bar">B</Pill>
-          <Pill tone="amber" active={!!s.loop} onClick={() => set({ loop: null })} title="Clear loop">
-            {s.loop ? "Clear" : "Off"}
-          </Pill>
-        </Group>
+        <div className="relative" ref={practiceRef}>
+          <Group label="More">
+            <Pill tone="amber" active={practice || s.metronome || s.countIn || !!s.loop} title="Metronome, count-in, loop, playback sound" onClick={() => setPractice((v) => !v)}>
+              Practice
+            </Pill>
+          </Group>
+          {practice && (
+            <div className="absolute bottom-[calc(100%+8px)] left-0 z-[60] w-64 rounded-2xl border border-white/10 bg-[#121226]/95 p-3 shadow-xl shadow-black/40 backdrop-blur-xl">
+              <div className="flex flex-wrap gap-1">
+                <Pill tone="amber" active={s.metronome} onClick={() => set({ metronome: !s.metronome })}>Metronome</Pill>
+                <Pill tone="amber" active={s.countIn} onClick={() => set({ countIn: !s.countIn })}>Count-in</Pill>
+                <Pill active={!s.appSound} onClick={() => set({ appSound: !s.appSound })}>{s.appSound ? "Sound on" : "Muted"}</Pill>
+              </div>
+              <div className="mt-2 text-[10px] font-semibold uppercase tracking-widest text-white/35">Loop</div>
+              <div className="mt-1 flex gap-1">
+                <Pill onClick={() => setLoopEdge("a")} title="Set loop start to current bar">A</Pill>
+                <Pill onClick={() => setLoopEdge("b")} title="Set loop end to current bar">B</Pill>
+                <Pill tone="amber" active={!!s.loop} onClick={() => set({ loop: null })} title="Clear loop">
+                  {s.loop ? "Clear" : "Off"}
+                </Pill>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
             </div>
           </div>

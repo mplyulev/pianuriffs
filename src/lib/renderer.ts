@@ -1,4 +1,4 @@
-import { engine, HIT, MISSED, useEngine } from "./engine";
+import { engine, HIT, HIT_WINDOW_SEC, MISSED, useEngine } from "./engine";
 import { emitNote } from "./midi";
 import { useLook, type HitStyleId } from "./look";
 import type { Hand } from "./song";
@@ -620,13 +620,36 @@ export class Renderer {
 
   private drawHitLine(top: number) {
     const { ctx } = this;
-    const [a, b, c] = useLook.getState().notes.line;
     const line = ctx.createLinearGradient(0, 0, this.w, 0);
-    line.addColorStop(0, a);
-    line.addColorStop(0.5, b);
-    line.addColorStop(1, c);
+    line.addColorStop(0, "#22d3ee");
+    line.addColorStop(0.5, "#818cf8");
+    line.addColorStop(1, "#f472b6");
+    ctx.save();
+    ctx.shadowColor = "rgba(34,211,238,0.85)";
+    ctx.shadowBlur = 18;
     ctx.fillStyle = line;
-    ctx.fillRect(0, top, this.w, 2.5);
+    ctx.fillRect(0, top - 1, this.w, 5);
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = "rgba(255,255,255,0.55)";
+    ctx.fillRect(0, top + 1, this.w, 1.2);
+    ctx.restore();
+
+    const j = engine.judgement;
+    const err = engine.lastError;
+    if (!j || err === null || j.bias === "wrong") return;
+    const age = (performance.now() - j.at) / 700;
+    if (age >= 1) return;
+    const x = this.w / 2 - (err / HIT_WINDOW_SEC) * Math.min(110, this.w * 0.18);
+    ctx.save();
+    ctx.globalAlpha = 1 - age;
+    ctx.fillStyle = j.bias === "perfect" ? "#a5f3fc" : j.bias === "early" ? "#c4b5fd" : "#fda4af";
+    ctx.beginPath();
+    ctx.moveTo(x, top - 11);
+    ctx.lineTo(x + 6, top - 1);
+    ctx.lineTo(x - 6, top - 1);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
   }
 
   private drawKeyboard(top: number, sounding: Map<number, Hand>, now: number) {
@@ -648,13 +671,9 @@ export class Renderer {
       if (isWrong) {
         top0 = "#ff5d6c";
         bot = "#c2263a";
-      } else if (burn > 0.2) {
-        const hue = hitHue(useLook.getState().hitFx);
-        top0 = `hsl(${hue},100%,${k.black ? 32 + burn * 18 : 70 + burn * 12}%)`;
-        bot = `hsl(${hue + 16},90%,${k.black ? 20 + burn * 10 : 46 + burn * 6}%)`;
-      } else if (held) {
-        top0 = k.black ? stage.heldBlackTop : stage.heldWhiteTop;
-        bot = k.black ? stage.heldBlackBot : stage.heldWhiteBot;
+      } else if (burn > 0.2 || held) {
+        top0 = k.black ? "#5eead4" : "#a5f3fc";
+        bot = k.black ? "#6366f1" : "#f472b6";
       } else if (hand) {
         const c = useLook.getState().notes.hands[hand];
         top0 = `hsl(${c.hue},${c.sat}%,${k.black ? 45 : 72}%)`;

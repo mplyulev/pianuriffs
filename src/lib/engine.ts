@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { type Hand, type Song } from "./song";
 import { synth } from "./audio";
 import { onNote, type NoteEvent } from "./midi";
-import { getSession, patchSession, rememberSong, songFromSession } from "./session";
+import { getSession, patchSession, persistSongPrefs, prefsForSong, rememberSong, recordSongRun, songFromSession } from "./session";
 
 export type Mode = "wait" | "play" | "echo";
 
@@ -25,17 +25,32 @@ export interface EngineState {
   wrongs: number;
   streak: number;
   best: number;
+  perfects: number;
+  earlies: number;
+  lates: number;
 }
 
-const freshStats = { hits: 0, misses: 0, wrongs: 0, streak: 0, best: 0, finished: false };
+const freshStats = {
+  hits: 0,
+  misses: 0,
+  wrongs: 0,
+  streak: 0,
+  best: 0,
+  finished: false,
+  perfects: 0,
+  earlies: 0,
+  lates: 0,
+};
 
 const saved = getSession();
+const bootSong = songFromSession();
+const bootPrefs = prefsForSong(bootSong);
 
 export const useEngine = create<EngineState>(() => ({
-  song: songFromSession(),
-  mode: saved.mode,
-  hands: saved.hands,
-  speed: saved.speed,
+  song: bootSong,
+  mode: bootPrefs?.mode ?? saved.mode,
+  hands: bootPrefs?.hands ?? saved.hands,
+  speed: bootPrefs?.speed ?? saved.speed,
   metronome: saved.metronome,
   appSound: saved.appSound,
   countIn: saved.countIn,
@@ -73,8 +88,10 @@ class Engine {
   held = new Set<number>();
   wrong = new Map<number, number>();
   fx: HitFx[] = [];
-  judgement: { text: string; at: number; good: boolean } | null = null;
+  judgement: { text: string; at: number; good: boolean; bias: "early" | "late" | "perfect" | "wrong" } | null = null;
   echoPhase: "call" | "reply" | "next" = "call";
+  timing: number[] = [];
+  lastError: number | null = null;
 
   private scanIdx = 0;
   private audioIdx = 0;
@@ -88,8 +105,10 @@ class Engine {
     this.loadSong(useEngine.getState().song);
     onNote((e, on) => this.handleNote(e, on));
     useEngine.subscribe((s, prev) => {
-      if (s.song !== prev.song) this.loadSong(s.song);
-      else if (s.mode !== prev.mode || s.hands !== prev.hands) {
+      if (s.song !== prev.song) {
+        persistSongPrefs(prev);
+        this.loadSong(s.song);
+      } else if (s.mode !== prev.mode || s.hands !== prev.hands) {
         this.echoPhase = "call";
         if (s.mode === "echo") {
           const { a } = this.phraseBounds(Math.max(0, this.pos));
@@ -111,6 +130,7 @@ class Engine {
         s.countIn !== prev.countIn
       ) {
         rememberSong(s.song);
+        persistSongPrefs(s);
         patchSession({
           mode: s.mode,
           hands: s.hands,
@@ -130,6 +150,8 @@ class Engine {
   private loadSong(song: Song) {
     this.status = new Uint8Array(song.notes.length);
     this.stats = { ...freshStats };
+    this.timing = [];
+    this.lastError = null;
     this.echoPhase = "call";
     this.pos = 0;
     this.reset(0);
@@ -169,6 +191,8 @@ class Engine {
 
   restart() {
     this.stats = { ...freshStats };
+    this.timing = [];
+    this.lastError = null;
     this.seek(this.s.loop?.a ?? 0);
     useEngine.setState({ ...freshStats });
   }
@@ -223,7 +247,7 @@ class Engine {
       }
       if (match < 0) return this.markWrong(e.midi);
       if (g.start - this.pos > 1) return;
-      this.markHit(match, true);
+      this.markHit(match, 0);
       if (s.mode === "echo" && this.phraseDone()) this.holdForNext();
       return;
     }
@@ -244,20 +268,28 @@ class Engine {
       }
     }
     if (best < 0) return this.markWrong(e.midi);
-    this.markHit(best, bestDist / bps <= PERFECT_WINDOW_SEC);
+    this.markHit(best, (notes[best].start - posAtEvent) / bps);
   }
 
-  private markHit(i: number, perfect: boolean) {
+  private markHit(i: number, errSec: number) {
     const n = this.s.song.notes[i];
+    const perfect = Math.abs(errSec) <= PERFECT_WINDOW_SEC;
+    const bias = perfect ? "perfect" : errSec < 0 ? "late" : "early";
     this.status[i] = HIT;
     this.stats.hits++;
     this.stats.streak++;
     this.stats.best = Math.max(this.stats.best, this.stats.streak);
+    if (perfect) this.stats.perfects++;
+    else if (bias === "early") this.stats.earlies++;
+    else this.stats.lates++;
+    this.timing.push(errSec);
+    this.lastError = errSec;
     this.fx.push({ midi: n.midi, hand: n.hand, perfect, index: i, dur: n.dur });
     this.judgement = {
-      text: perfect ? "Perfect" : "Good",
+      text: perfect ? "Perfect" : bias === "early" ? "Early" : "Late",
       at: performance.now(),
       good: true,
+      bias,
     };
     this.dirty = true;
   }
@@ -313,9 +345,7 @@ class Engine {
         this.parkNext(this.s.loop.a);
         return;
       }
-      this.stats.finished = true;
-      this.flush(true);
-      useEngine.setState({ playing: false });
+      this.finishRun();
       return;
     }
     this.parkNext(b);
@@ -349,8 +379,16 @@ class Engine {
     this.stats.wrongs++;
     this.stats.streak = 0;
     this.wrong.set(midi, performance.now() + 350);
-    this.judgement = { text: "Wrong note", at: performance.now(), good: false };
+    this.judgement = { text: "Wrong note", at: performance.now(), good: false, bias: "wrong" };
+    this.lastError = null;
     this.dirty = true;
+  }
+
+  private finishRun() {
+    this.stats.finished = true;
+    this.flush(true);
+    useEngine.setState({ playing: false });
+    recordSongRun(this.s.song, accuracy(this.stats));
   }
 
   private flush(force = false) {
@@ -439,9 +477,7 @@ class Engine {
     }
 
     if (next >= s.song.length + 0.5) {
-      this.stats.finished = true;
-      this.flush(true);
-      useEngine.setState({ playing: false });
+      this.finishRun();
       return;
     }
     this.flush();
@@ -450,7 +486,27 @@ class Engine {
 
 export const engine = new Engine();
 
+export function selectSong(song: Song, extra: Partial<EngineState> = {}) {
+  const prefs = prefsForSong(song);
+  useEngine.setState({
+    playing: false,
+    loop: null,
+    ...(prefs ?? {}),
+    ...extra,
+    song,
+  });
+}
+
 export function accuracy(s: Pick<EngineState, "hits" | "misses" | "wrongs">) {
   const total = s.hits + s.misses + s.wrongs;
   return total === 0 ? null : Math.round((s.hits / total) * 100);
+}
+
+export function gradeFor(acc: number | null): "S" | "A" | "B" | "C" | "D" | "—" {
+  if (acc === null) return "—";
+  if (acc >= 95) return "S";
+  if (acc >= 85) return "A";
+  if (acc >= 70) return "B";
+  if (acc >= 50) return "C";
+  return "D";
 }

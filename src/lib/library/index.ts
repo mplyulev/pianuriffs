@@ -96,3 +96,28 @@ export function loadItem(cat: Category, index: number): Song {
 export function barsOf(song: Song) {
   return Math.ceil(song.length / song.beatsPerBar - 0.08);
 }
+
+export function difficultyOf(song: Song): 1 | 2 | 3 | 4 | 5 {
+  const bars = Math.max(1, song.length / song.beatsPerBar);
+  const density = song.notes.length / bars;
+  const span = song.notes.reduce((a, n) => Math.max(a, n.midi), 0) - song.notes.reduce((a, n) => Math.min(a, n.midi), 127);
+  const score = density * 0.65 + span * 0.08;
+  if (score < 4.5) return 1;
+  if (score < 8) return 2;
+  if (score < 12) return 3;
+  if (score < 17) return 4;
+  return 5;
+}
+
+export function dailyPick(at = new Date()) {
+  const day = Math.floor(Date.UTC(at.getFullYear(), at.getMonth(), at.getDate()) / 86400000);
+  let n = 0;
+  for (const c of CATEGORIES) n += c.items.length;
+  let i = ((day * 2654435761) >>> 0) % Math.max(1, n);
+  for (const category of CATEGORIES) {
+    if (i < category.items.length) return { category, index: i, song: loadItem(category, i) };
+    i -= category.items.length;
+  }
+  const category = CATEGORIES[0];
+  return { category, index: 0, song: loadItem(category, 0) };
+}

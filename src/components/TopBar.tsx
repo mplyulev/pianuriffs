@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useMidi, useKeyboardOctave } from "../lib/midi";
-import { useEngine } from "../lib/engine";
+import { selectSong, useEngine } from "../lib/engine";
 import { DEMO_SONG, parseMidiFile } from "../lib/song";
 import { setLibraryOpen } from "../lib/ui";
 import { SoundPanel } from "./SoundPanel";
@@ -34,7 +34,7 @@ export function TopBar() {
     if (!f) return;
     try {
       const parsed = await parseMidiFile(f);
-      useEngine.setState({ song: parsed, playing: false, loop: null });
+      selectSong(parsed);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not read that file");
@@ -105,7 +105,7 @@ export function TopBar() {
         </button>
         {song !== DEMO_SONG && (
           <button
-            onClick={() => useEngine.setState({ song: DEMO_SONG, playing: false, loop: null })}
+            onClick={() => selectSong(DEMO_SONG)}
             className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white/50 hover:text-white"
           >
             Demo song
