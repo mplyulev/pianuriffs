@@ -47,7 +47,7 @@ body {
   .welcome-sheen {
     animation: none;
   }
-  .welcome-brick { top: var(--rest); opacity: 0.9; }
+  .welcome-brick { opacity: 0.85; }
 }
 
 .glass {

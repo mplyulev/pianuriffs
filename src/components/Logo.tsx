@@ -12,7 +12,7 @@ export function Logo({ wordmark = false, stacked = false, light = false, size = 
       {wordmark && (
         <span className={`font-bold leading-none tracking-tight ${stacked ? "text-4xl sm:text-5xl" : "truncate text-[1.65rem]"}`}>
           <span className={light ? "text-slate-900" : "text-white"}>piano</span>
-          <span className="bg-gradient-to-r from-cyan-500 via-indigo-500 to-pink-500 bg-clip-text text-transparent">riffs</span>
+          <span className="bg-gradient-to-r from-cyan-300 via-indigo-200 to-pink-300 bg-clip-text text-transparent">riffs</span>
         </span>
       )}
     </div>
