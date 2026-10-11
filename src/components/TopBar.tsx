@@ -6,6 +6,7 @@ import { setLibraryOpen } from "../lib/ui";
 import { SoundPanel } from "./SoundPanel";
 import { LookPanel } from "./LookPanel";
 import { CoffeeButton } from "./CoffeeButton";
+import { Logo } from "./Logo";
 import { Stats } from "./Stats";
 
 export function TopBar() {
@@ -59,9 +60,7 @@ export function TopBar() {
         <div className="overflow-hidden">
           <header className="glass pointer-events-auto grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1.5 rounded-2xl px-4 py-2.5 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:gap-3">
       <div className="col-start-1 row-start-1 flex min-w-0 items-center gap-3">
-        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-cyan-400 via-indigo-500 to-pink-500 text-lg font-extrabold text-white shadow-lg shadow-indigo-500/30">
-          K
-        </div>
+        <Logo size={36} />
         <div className="min-w-0 leading-tight">
           <div className="truncate text-sm font-bold tracking-tight">{song.title}</div>
           <div className="truncate text-xs text-white/45">

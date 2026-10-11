@@ -1,4 +1,4 @@
-# Keystream
+# pianoriffs
 
 Browser-based piano practice with a MIDI keyboard: falling notes, wait / play-along modes, and note judging. Fully client-side and static (no backend, no accounts).
 
@@ -15,7 +15,7 @@ Use Chrome, Edge or Opera for Web MIDI. Without a MIDI keyboard you can play wit
 
 ## Support
 
-Buy Me a Coffee and the sponsor card are set in `src/lib/sponsors.ts`. Change `COFFEE_URL` to your page. To serve Google AdSense in the welcome and corner slots instead of that card, set `VITE_ADSENSE_CLIENT`, `VITE_ADSENSE_SLOT_WELCOME`, and `VITE_ADSENSE_SLOT_DOCK`.
+Buy Me a Coffee is set in `src/lib/sponsors.ts`. Change `COFFEE_URL` to your page.
 
 ## Features
 

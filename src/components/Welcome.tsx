@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMidi } from "../lib/midi";
 import { CoffeeButton } from "./CoffeeButton";
-import { SponsorCard } from "./SponsorCard";
+import { Logo } from "./Logo";
 
 export function Welcome({ onEnter }: { onEnter: () => void }) {
   const midi = useMidi();
@@ -33,19 +33,14 @@ export function Welcome({ onEnter }: { onEnter: () => void }) {
   return (
     <div className="absolute inset-0 z-40 flex items-center justify-center bg-[#07070f]/88 p-4 backdrop-blur-md">
       <div className="rise glass w-full max-w-md rounded-3xl px-6 py-7 sm:px-8">
-        <div className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-cyan-400 via-indigo-500 to-pink-500 text-xl font-extrabold text-white shadow-lg shadow-indigo-500/30">
-          K
-        </div>
-        <h1 className="mt-4 text-2xl font-bold tracking-tight">Keystream</h1>
-        <p className="mt-1 text-sm text-white/50">Falling notes, at your tempo.</p>
+        <h1>
+          <Logo wordmark size={52} />
+        </h1>
+        <p className="mt-3 text-sm text-white/50">Falling notes, at your tempo.</p>
 
         <div className="mt-5 flex items-center gap-2.5 text-sm text-white/80">
           <span className={`h-2 w-2 shrink-0 rounded-full ${connected ? "bg-emerald-400 shadow-[0_0_8px_#34d399]" : "bg-white/40"} ${midi.status === "idle" && midi.supported ? "animate-pulse" : ""}`} />
           <span>{status}</span>
-        </div>
-
-        <div className="mt-6">
-          <SponsorCard slot="welcome" />
         </div>
 
         <div className="mt-6 flex flex-col gap-2 sm:flex-row">

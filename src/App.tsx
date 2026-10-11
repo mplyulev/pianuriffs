@@ -8,12 +8,10 @@ import { Controls } from "./components/Controls";
 import { Results } from "./components/Results";
 import { Library } from "./components/Library";
 import { Welcome } from "./components/Welcome";
-import { SponsorCard } from "./components/SponsorCard";
 
 export default function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [welcome, setWelcome] = useState(true);
-  const [sponsor, setSponsor] = useState(true);
 
   useEffect(() => {
     const r = new Renderer(canvasRef.current!);
@@ -57,11 +55,6 @@ export default function App() {
       <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-3 sm:p-4">
         <div className="flex flex-col gap-3">
           <TopBar />
-          {!welcome && sponsor && (
-            <div className="flex">
-              <SponsorCard slot="dock" onDismiss={() => setSponsor(false)} />
-            </div>
-          )}
         </div>
       </div>
       <Controls />
