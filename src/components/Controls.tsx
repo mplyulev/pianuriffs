@@ -165,8 +165,8 @@ export function Controls() {
         </Group>
 
         <Group label="Hands you play">
-          <Pill tone="pink" active={s.hands.L} onClick={() => toggleHand("L")}>Left</Pill>
-          <Pill tone="cyan" active={s.hands.R} onClick={() => toggleHand("R")}>Right</Pill>
+          <Pill tone="pink" active={s.hands.L} title="Left hand. Off dims these notes and mutes them" onClick={() => toggleHand("L")}>Left</Pill>
+          <Pill tone="cyan" active={s.hands.R} title="Right hand. Off dims these notes and mutes them" onClick={() => toggleHand("R")}>Right</Pill>
         </Group>
 
         <div className="flex flex-col gap-1">

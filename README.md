@@ -22,7 +22,7 @@ Buy Me a Coffee and the sponsor card are set in `src/lib/sponsors.ts`. Change `C
 - Web MIDI input with hot-plug, built-in WebAudio piano synth (no samples to download)
 - 60fps canvas falling-notes view and 88-key-aware keyboard
 - Modes: Play along (timing window judging), Wait (pauses until you play the chord), Call & response (plays two bars, then waits for you to play them back; Space or Enter starts the next part)
-- Hand selection (the other hand plays as accompaniment), tempo, metronome, count-in, A/B bar loop
+- Hand selection (a hand that is off is dimmed and silent), tempo, metronome, count-in, A/B bar loop
 - Demo song (Ode to Joy) and Standard MIDI file import
 
 ## Layout

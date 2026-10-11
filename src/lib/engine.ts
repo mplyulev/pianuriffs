@@ -401,7 +401,7 @@ class Engine {
     while (this.audioIdx < notes.length && notes[this.audioIdx].start <= next) {
       const n = notes[this.audioIdx++];
       const idx = this.audioIdx - 1;
-      if (hearScore) synth.noteOn(n.midi, (n.vel ?? 0.7) * (this.isRequired(idx) ? 0.4 : 0.85), n.dur / bps);
+      if (hearScore && this.isRequired(idx)) synth.noteOn(n.midi, (n.vel ?? 0.7) * 0.4, n.dur / bps);
     }
     if (replyAt !== null) {
       this.beginReply(replyAt);
