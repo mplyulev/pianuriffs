@@ -1,6 +1,6 @@
 import { COFFEE_URL } from "../lib/sponsors";
 
-export function CoffeeButton({ prominent = false }: { prominent?: boolean }) {
+export function CoffeeButton({ prominent = false, light = false }: { prominent?: boolean; light?: boolean }) {
   return (
     <a
       href={COFFEE_URL}
@@ -8,7 +8,9 @@ export function CoffeeButton({ prominent = false }: { prominent?: boolean }) {
       rel="noreferrer"
       className={
         prominent
-          ? "inline-flex cursor-pointer items-center justify-center gap-2 rounded-full border border-amber-200/20 bg-amber-300/10 px-4 py-2.5 text-sm font-semibold text-amber-100 transition hover:bg-amber-300/20"
+          ? light
+            ? "inline-flex cursor-pointer items-center justify-center gap-2 rounded-full border border-amber-300/70 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-950 transition hover:bg-amber-100"
+            : "inline-flex cursor-pointer items-center justify-center gap-2 rounded-full border border-amber-200/20 bg-amber-300/10 px-4 py-2.5 text-sm font-semibold text-amber-100 transition hover:bg-amber-300/20"
           : "inline-flex items-center gap-1.5 rounded-lg bg-amber-300/10 px-3 py-1.5 text-xs font-semibold text-amber-100 transition hover:bg-amber-300/20"
       }
       title="Buy me a coffee"
