@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { getSession, patchSession } from "./session";
 
 export interface NoteEvent {
   midi: number;
@@ -209,7 +210,7 @@ const KEYMAP: Record<string, number> = {
   k: 12, o: 13, l: 14, p: 15, ";": 16,
 };
 
-export const useKeyboardOctave = create<{ octave: number }>(() => ({ octave: 4 }));
+export const useKeyboardOctave = create<{ octave: number }>(() => ({ octave: getSession().octave }));
 
 export function installComputerKeyboard() {
   const down = new Map<string, number>();
@@ -219,9 +220,11 @@ export function installComputerKeyboard() {
     if (t.tagName === "INPUT" || t.tagName === "SELECT") return;
     const k = e.key.toLowerCase();
     if (k === "z" || k === "x") {
-      useKeyboardOctave.setState((s) => ({
-        octave: Math.min(7, Math.max(1, s.octave + (k === "x" ? 1 : -1))),
-      }));
+      useKeyboardOctave.setState((s) => {
+        const octave = Math.min(7, Math.max(1, s.octave + (k === "x" ? 1 : -1)));
+        patchSession({ octave });
+        return { octave };
+      });
       return;
     }
     const off = KEYMAP[k];

@@ -1,7 +1,8 @@
 import { create } from "zustand";
-import { DEMO_SONG, type Hand, type Song } from "./song";
+import { type Hand, type Song } from "./song";
 import { synth } from "./audio";
 import { onNote, type NoteEvent } from "./midi";
+import { getSession, patchSession, rememberSong, songFromSession } from "./session";
 
 export type Mode = "wait" | "play" | "echo";
 
@@ -28,14 +29,16 @@ export interface EngineState {
 
 const freshStats = { hits: 0, misses: 0, wrongs: 0, streak: 0, best: 0, finished: false };
 
+const saved = getSession();
+
 export const useEngine = create<EngineState>(() => ({
-  song: DEMO_SONG,
-  mode: "play",
-  hands: { L: true, R: true },
-  speed: 0.8,
-  metronome: false,
-  appSound: true,
-  countIn: true,
+  song: songFromSession(),
+  mode: saved.mode,
+  hands: saved.hands,
+  speed: saved.speed,
+  metronome: saved.metronome,
+  appSound: saved.appSound,
+  countIn: saved.countIn,
   loop: null,
   playing: false,
   ...freshStats,
@@ -82,7 +85,7 @@ class Engine {
   private stats = { ...freshStats };
 
   constructor() {
-    this.loadSong(DEMO_SONG);
+    this.loadSong(useEngine.getState().song);
     onNote((e, on) => this.handleNote(e, on));
     useEngine.subscribe((s, prev) => {
       if (s.song !== prev.song) this.loadSong(s.song);
@@ -97,6 +100,25 @@ class Engine {
       if (s.playing !== prev.playing) {
         if (s.playing) this.onPlay();
         else synth.allOff();
+      }
+      if (
+        s.song !== prev.song ||
+        s.mode !== prev.mode ||
+        s.hands !== prev.hands ||
+        s.speed !== prev.speed ||
+        s.metronome !== prev.metronome ||
+        s.appSound !== prev.appSound ||
+        s.countIn !== prev.countIn
+      ) {
+        rememberSong(s.song);
+        patchSession({
+          mode: s.mode,
+          hands: s.hands,
+          speed: s.speed,
+          metronome: s.metronome,
+          appSound: s.appSound,
+          countIn: s.countIn,
+        });
       }
     });
   }
