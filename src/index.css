@@ -20,19 +20,17 @@ body {
 }
 .rise { animation: rise 0.45s ease both; }
 
-@keyframes note-fall {
-  0% { transform: translateY(-30vh); opacity: 0; }
-  14% { opacity: 1; }
-  82% { opacity: 0.85; }
-  100% { transform: translateY(105vh); opacity: 0; }
+@keyframes score-glide {
+  from { transform: translateX(0); }
+  to { transform: translateX(-480px); }
 }
-.welcome-note { animation: note-fall linear infinite; }
+.welcome-score { animation: score-glide linear infinite; }
 
 @keyframes glow-drift {
   0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-  50% { transform: translate3d(6%, -8%, 0) scale(1.12); }
+  50% { transform: translate3d(3%, -4%, 0) scale(1.06); }
 }
-.welcome-glow { animation: glow-drift 9s ease-in-out infinite; }
+.welcome-glow { animation: glow-drift 18s ease-in-out infinite; }
 
 @keyframes halo {
   0%, 100% { opacity: 0.35; transform: scale(0.86); }
@@ -48,7 +46,7 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .rise,
-  .welcome-note,
+  .welcome-score,
   .welcome-glow,
   .welcome-halo,
   .welcome-sheen {

@@ -3,17 +3,119 @@ import { useMidi } from "../lib/midi";
 import { CoffeeButton } from "./CoffeeButton";
 import { Logo } from "./Logo";
 
-const NOTES = [
-  { left: "7%", delay: "0s", dur: "8.5s", h: 86, w: 16, color: "bg-cyan-300/80" },
-  { left: "16%", delay: "2.2s", dur: "10s", h: 120, w: 12, color: "bg-pink-400/75" },
-  { left: "28%", delay: "0.8s", dur: "9.2s", h: 64, w: 14, color: "bg-indigo-300/80" },
-  { left: "63%", delay: "1.5s", dur: "11s", h: 140, w: 16, color: "bg-fuchsia-400/70" },
-  { left: "74%", delay: "3.1s", dur: "8.8s", h: 78, w: 12, color: "bg-cyan-200/80" },
-  { left: "84%", delay: "0.4s", dur: "10.4s", h: 108, w: 15, color: "bg-indigo-400/75" },
-  { left: "92%", delay: "2.6s", dur: "9.6s", h: 56, w: 11, color: "bg-pink-300/70" },
+type Tone = { x: number; step: number; eighth?: boolean; dot?: boolean };
+
+const PHRASE_W = 480;
+const COPIES = 6;
+const STAFF_H = 112;
+const STAFF = [38, 46, 54, 62, 70];
+
+const UPPER: Tone[] = [
+  { x: 28, step: 0 },
+  { x: 78, step: 2, eighth: true },
+  { x: 118, step: 4, eighth: true },
+  { x: 176, step: 7 },
+  { x: 232, step: 5, eighth: true, dot: true },
+  { x: 278, step: 4, eighth: true },
+  { x: 336, step: 2 },
+  { x: 392, step: 1, eighth: true },
+  { x: 436, step: 0, eighth: true },
 ];
 
-const WHITES = 16;
+const LOWER: Tone[] = [
+  { x: 36, step: 5 },
+  { x: 96, step: 3, eighth: true },
+  { x: 140, step: 2, eighth: true },
+  { x: 196, step: 0 },
+  { x: 256, step: 2, eighth: true },
+  { x: 304, step: 4, eighth: true },
+  { x: 364, step: 3 },
+  { x: 424, step: 5, eighth: true },
+];
+
+function headY(step: number) {
+  return 70 - step * 4;
+}
+
+function Phrase({ notes, color, stemDown }: { notes: Tone[]; color: string; stemDown?: boolean }) {
+  const beamed = new Set<number>();
+  const beams: [Tone, Tone][] = [];
+  for (let i = 0; i < notes.length - 1; i++) {
+    const a = notes[i];
+    const b = notes[i + 1];
+    if (a.eighth && b.eighth && b.x - a.x < 58) {
+      beams.push([a, b]);
+      beamed.add(i);
+      beamed.add(i + 1);
+      i++;
+    }
+  }
+  return (
+    <svg width={PHRASE_W} height="100%" viewBox={`0 0 ${PHRASE_W} ${STAFF_H}`} preserveAspectRatio="none" className="h-full shrink-0" fill={color}>
+      {notes.map((n, i) => {
+        const y = headY(n.step);
+        const stemX = stemDown ? n.x - 4.6 : n.x + 4.4;
+        const stemY = stemDown ? y : y - 26;
+        return (
+          <g key={i}>
+            <ellipse cx={n.x} cy={y} rx="5.4" ry="3.6" transform={`rotate(-18 ${n.x} ${y})`} />
+            <rect x={stemX} y={stemY} width="1.15" height="26" rx="0.3" />
+            {n.eighth && !beamed.has(i) && (
+              <path
+                d={stemDown
+                  ? `M${stemX} ${y + 26} c 7 -2 11 -8 6 -15`
+                  : `M${stemX + 1.1} ${y - 26} c 7 3 10 10 5 16`}
+                fill="none"
+                stroke={color}
+                strokeWidth="1.25"
+              />
+            )}
+            {n.dot && <circle cx={n.x + 10} cy={y - 2} r="1.35" />}
+          </g>
+        );
+      })}
+      {beams.map(([a, b], i) => {
+        const y1 = headY(a.step) + (stemDown ? 26 : -26);
+        const y2 = headY(b.step) + (stemDown ? 26 : -26);
+        const x1 = stemDown ? a.x - 4.6 : a.x + 4.4;
+        const x2 = stemDown ? b.x - 4.6 : b.x + 5.5;
+        const thick = stemDown ? 2.2 : -2.2;
+        return <polygon key={i} points={`${x1},${y1} ${x2},${y2} ${x2},${y2 + thick} ${x1},${y1 + thick}`} />;
+      })}
+    </svg>
+  );
+}
+
+function Score({ notes, color, duration, reverse, className, stemDown }: {
+  notes: Tone[];
+  color: string;
+  duration: string;
+  reverse?: boolean;
+  className: string;
+  stemDown?: boolean;
+}) {
+  return (
+    <div
+      className={`pointer-events-none absolute inset-x-0 h-[112px] ${className}`}
+      style={{ maskImage: "linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent)" }}
+      aria-hidden
+    >
+      {STAFF.map((y) => (
+        <div key={y} className="absolute right-0 left-0 h-px bg-white/14" style={{ top: `${(y / STAFF_H) * 100}%` }} />
+      ))}
+      <div className="absolute inset-0 overflow-hidden">
+        <div
+          className={`welcome-score flex h-full ${reverse ? "[animation-direction:reverse]" : ""}`}
+          style={{ width: PHRASE_W * COPIES, animationDuration: duration }}
+        >
+          {Array.from({ length: COPIES }, (_, i) => (
+            <Phrase key={i} notes={notes} color={color} stemDown={stemDown} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function Welcome({ onEnter }: { onEnter: () => void }) {
   const midi = useMidi();
@@ -44,42 +146,11 @@ export function Welcome({ onEnter }: { onEnter: () => void }) {
 
   return (
     <div className="absolute inset-0 z-40 overflow-hidden bg-[#07070f]">
-      <div className="welcome-glow pointer-events-none absolute -left-24 top-8 h-80 w-80 rounded-full bg-cyan-400/25 blur-3xl" />
-      <div className="welcome-glow pointer-events-none absolute -right-20 bottom-16 h-96 w-96 rounded-full bg-fuchsia-500/20 blur-3xl [animation-delay:-4s]" />
-      <div className="pointer-events-none absolute left-1/2 top-1/3 -translate-x-1/2">
-        <div className="welcome-glow h-64 w-64 rounded-full bg-indigo-500/20 blur-3xl [animation-delay:-2s]" />
-      </div>
+      <div className="welcome-glow pointer-events-none absolute -left-28 top-0 h-80 w-80 rounded-full bg-indigo-500/10 blur-3xl" />
+      <div className="welcome-glow pointer-events-none absolute -right-24 bottom-0 h-96 w-96 rounded-full bg-cyan-400/8 blur-3xl [animation-delay:-8s]" />
 
-      {NOTES.map((n) => (
-        <span
-          key={n.left}
-          aria-hidden
-          className={`welcome-note pointer-events-none absolute top-0 rounded-md ${n.color} shadow-[0_0_18px_rgba(255,255,255,0.18)]`}
-          style={{
-            left: n.left,
-            width: n.w,
-            height: n.h,
-            animationDelay: n.delay,
-            animationDuration: n.dur,
-          }}
-        />
-      ))}
-
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28">
-        <div className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-cyan-200/90 to-transparent shadow-[0_0_16px_#67e8f9]" />
-        <div className="flex h-full items-end gap-0.5 px-2 pb-0 opacity-90">
-          {Array.from({ length: WHITES }, (_, i) => {
-            const black = [0, 1, 3, 4, 5].includes(i % 7);
-            return (
-              <div key={i} className="relative h-[82%] min-w-0 flex-1 rounded-t-md bg-gradient-to-b from-white to-zinc-300">
-                {black && i < WHITES - 1 && (
-                  <div className="absolute -right-1.5 top-0 z-10 h-[58%] w-3 rounded-b-sm bg-zinc-950 shadow-md sm:w-4" />
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      <Score notes={UPPER} color="rgba(236, 232, 222, 0.78)" duration="42s" className="top-[8%] sm:top-[12%]" />
+      <Score notes={LOWER} color="rgba(176, 186, 230, 0.42)" duration="58s" reverse stemDown className="bottom-[6%] sm:bottom-[9%]" />
 
       <div className="relative z-10 flex h-full items-center justify-center p-4">
         <div className="rise glass w-full max-w-md rounded-[2rem] px-6 py-8 text-center sm:px-10 sm:py-10">
