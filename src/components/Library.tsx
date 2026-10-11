@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { CATEGORIES, barsOf, loadItem } from "../lib/library";
 import { useEngine } from "../lib/engine";
-import { setLibraryOpen, useUi } from "../lib/ui";
+import { setLibraryCategory, setLibraryOpen, useUi } from "../lib/ui";
 
 export function Library() {
   const open = useUi((s) => s.libraryOpen);
   const current = useEngine((s) => s.song);
-  const [catId, setCatId] = useState(CATEGORIES[0].id);
-  const cat = CATEGORIES.find((c) => c.id === catId)!;
+  const catId = useUi((s) => s.libraryCategory);
+  const setCatId = setLibraryCategory;
+  const cat = CATEGORIES.find((c) => c.id === catId) ?? CATEGORIES[0];
   const songs = useMemo(() => cat.items.map((_, i) => loadItem(cat, i)), [cat]);
 
   useEffect(() => {

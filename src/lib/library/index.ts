@@ -58,6 +58,31 @@ export const CATEGORIES: Category[] = [
 ];
 
 const cache = new Map<string, Song>();
+
+export function locateSong(current: Song): { category: Category; index: number } | null {
+  for (const category of CATEGORIES) {
+    for (let index = 0; index < category.items.length; index++) {
+      if (loadItem(category, index) === current) return { category, index };
+    }
+  }
+  return null;
+}
+
+/** Next piece in the same category, or the first piece of the following category. */
+export function nextAfter(current: Song): { song: Song; category: Category } {
+  const found = locateSong(current);
+  if (!found) {
+    const category = CATEGORIES[0];
+    return { song: loadItem(category, 0), category };
+  }
+  if (found.index + 1 < found.category.items.length) {
+    return { song: loadItem(found.category, found.index + 1), category: found.category };
+  }
+  const ci = CATEGORIES.indexOf(found.category);
+  const category = CATEGORIES[(ci + 1) % CATEGORIES.length];
+  return { song: loadItem(category, 0), category };
+}
+
 export function loadItem(cat: Category, index: number): Song {
   const key = `${cat.id}:${index}`;
   let s = cache.get(key);
