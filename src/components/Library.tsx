@@ -107,8 +107,8 @@ export function Library() {
               <li key={`${cat.id}${i}`}>
                 <button
                   onClick={() => pick(i)}
-                  onMouseEnter={() => setHover(i)}
-                  onMouseLeave={() => setHover(null)}
+                  onPointerEnter={() => setHover(i)}
+                  onPointerLeave={() => setHover(null)}
                   onFocus={() => setHover(i)}
                   onBlur={() => setHover(null)}
                   className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${
@@ -116,16 +116,10 @@ export function Library() {
                   }`}
                 >
                   <span
-                    className="relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-xl text-xs font-bold text-white"
+                    className="grid h-12 w-12 shrink-0 place-items-center rounded-xl text-xs font-bold text-white"
                     style={{ background: `linear-gradient(145deg, hsl(${hue} 80% 58%), hsl(${(hue + 48) % 360} 70% 42%))` }}
                   >
-                    {hover === i ? (
-                      <span className="absolute inset-0 bg-black/35 p-0.5">
-                        <RiffPreview song={s} />
-                      </span>
-                    ) : (
-                      <span className="drop-shadow">{i + 1}</span>
-                    )}
+                    {i + 1}
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2">
@@ -140,6 +134,11 @@ export function Library() {
                         ? `Played ${mem.plays} · best ${mem.bestAcc === null ? "—" : `${Math.round(mem.bestAcc)}%`}`
                         : "Not played yet"}
                     </span>
+                    {(hover === i || active) && (
+                      <span className="mt-1.5 block h-9 overflow-hidden rounded-lg bg-black/35">
+                        <RiffPreview song={s} />
+                      </span>
+                    )}
                   </span>
                   {active && <span className="h-2 w-2 shrink-0 rounded-full bg-cyan-300 shadow-[0_0_8px_#67e8f9]" />}
                 </button>

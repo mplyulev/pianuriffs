@@ -68,17 +68,7 @@ export function Controls() {
   }, []);
   const [minimized, setMinimized] = useState(false);
   const [practice, setPractice] = useState(false);
-  const practiceRef = useRef<HTMLDivElement>(null);
   const collapsed = !hover && (s.playing || minimized);
-
-  useEffect(() => {
-    if (!practice) return;
-    const onDown = (e: PointerEvent) => {
-      if (!practiceRef.current?.contains(e.target as Node)) setPractice(false);
-    };
-    document.addEventListener("pointerdown", onDown);
-    return () => document.removeEventListener("pointerdown", onDown);
-  }, [practice]);
 
   const toggleHand = (h: "L" | "R") => {
     const next = { ...s.hands, [h]: !s.hands[h] };
@@ -175,31 +165,30 @@ export function Controls() {
             <span className="w-9 text-xs font-semibold tabular-nums text-white/70">{Math.round(s.speed * 100)}%</span>
           </div>
         </div>
-        <div className="relative" ref={practiceRef}>
+        <div className="relative">
           <Group label="More">
             <Pill tone="amber" active={practice || s.metronome || s.countIn || !!s.loop} title="Metronome, count-in, loop, playback sound" onClick={() => setPractice((v) => !v)}>
               Practice
             </Pill>
           </Group>
-          {practice && (
-            <div className="absolute bottom-[calc(100%+8px)] left-0 z-[60] w-64 rounded-2xl border border-white/10 bg-[#121226]/95 p-3 shadow-xl shadow-black/40 backdrop-blur-xl">
-              <div className="flex flex-wrap gap-1">
-                <Pill tone="amber" active={s.metronome} onClick={() => set({ metronome: !s.metronome })}>Metronome</Pill>
-                <Pill tone="amber" active={s.countIn} onClick={() => set({ countIn: !s.countIn })}>Count-in</Pill>
-                <Pill active={!s.appSound} onClick={() => set({ appSound: !s.appSound })}>{s.appSound ? "Sound on" : "Muted"}</Pill>
-              </div>
-              <div className="mt-2 text-[10px] font-semibold uppercase tracking-widest text-white/35">Loop</div>
-              <div className="mt-1 flex gap-1">
-                <Pill onClick={() => setLoopEdge("a")} title="Set loop start to current bar">A</Pill>
-                <Pill onClick={() => setLoopEdge("b")} title="Set loop end to current bar">B</Pill>
-                <Pill tone="amber" active={!!s.loop} onClick={() => set({ loop: null })} title="Clear loop">
-                  {s.loop ? "Clear" : "Off"}
-                </Pill>
-              </div>
-            </div>
-          )}
         </div>
       </div>
+      {practice && (
+        <div className="flex flex-wrap items-end gap-3 border-t border-white/8 pt-2">
+          <Group label="Practice">
+            <Pill tone="amber" active={s.metronome} onClick={() => set({ metronome: !s.metronome })}>Metronome</Pill>
+            <Pill tone="amber" active={s.countIn} onClick={() => set({ countIn: !s.countIn })}>Count-in</Pill>
+            <Pill active={!s.appSound} onClick={() => set({ appSound: !s.appSound })}>{s.appSound ? "Sound on" : "Muted"}</Pill>
+          </Group>
+          <Group label="Loop">
+            <Pill onClick={() => setLoopEdge("a")} title="Set loop start to current bar">A</Pill>
+            <Pill onClick={() => setLoopEdge("b")} title="Set loop end to current bar">B</Pill>
+            <Pill tone="amber" active={!!s.loop} onClick={() => set({ loop: null })} title="Clear loop">
+              {s.loop ? "Clear" : "Off"}
+            </Pill>
+          </Group>
+        </div>
+      )}
             </div>
           </div>
         </div>
