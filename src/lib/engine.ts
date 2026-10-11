@@ -151,6 +151,13 @@ class Engine {
     useEngine.setState({ ...freshStats });
   }
 
+  /** Hide the finished summary. Leaves playback, position, and the score alone. */
+  dismissResults() {
+    this.stats.finished = false;
+    this.dirty = false;
+    useEngine.setState({ finished: false });
+  }
+
   private onPlay() {
     const s = this.s;
     if (this.stats.finished || this.pos >= s.song.length) this.restart();
