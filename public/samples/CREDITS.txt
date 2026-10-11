@@ -1,0 +1,20 @@
+Keystream instrument recordings
+
+Grand piano
+  Salamander Grand Piano V3
+  Recorded by Alexander Holm (Yamaha C5)
+  License: Creative Commons Attribution 3.0 (CC BY 3.0)
+  https://creativecommons.org/licenses/by/3.0/
+  Source: https://github.com/sfzinstruments/SalamanderGrandPiano
+
+  Keystream ships a mono subset: velocity layers v2, v6, v11, and v16,
+  with the long tails shortened, plus the hammer-release noises.
+  Pitch zones follow the original instrument map.
+
+Electric bass
+  FreePats electric-bass-YR, fingered and picked
+  Yamaha RBX recorded by Andrea Biasior
+  License: CC0 1.0 (public domain)
+  Source: https://github.com/freepats/electric-bass-YR
+
+The other Keystream instruments are synthesized in the browser.

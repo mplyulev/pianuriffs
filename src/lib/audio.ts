@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { PROGRAMS, type SampleId, type SampleProgram, type SampleZone } from "./sampleBank";
 
 interface Osc {
   type: OscillatorType;
@@ -11,6 +12,7 @@ export interface Patch {
   id: string;
   name: string;
   group: "keys" | "bass";
+  sample?: SampleId;
   oscs: Osc[];
   fm?: { ratio: number; index: number; decay: number };
   filter?: { start: number; end: number; time: number; q?: number; min?: number };
@@ -21,13 +23,20 @@ export interface Patch {
 
 const saw = (detune: number, amp = 1): Osc => ({ type: "sawtooth", amp, detune });
 
+const pianoOsc = {
+  oscs: [
+    { type: "triangle" as const, amp: 1 },
+    { type: "sine" as const, mult: 2, amp: 0.45 },
+    { type: "sine" as const, mult: 3, amp: 0.18 },
+    { type: "sine" as const, mult: 4, amp: 0.08 },
+  ],
+  filter: { start: 7, end: 2, time: 1.2, min: 600 },
+  env: { a: 0.008, d: 0.25, s: 0.35, tail: 4.5, r: 0.22 },
+};
+
 export const PATCHES: Patch[] = [
-  {
-    id: "piano", name: "Grand Piano", group: "keys", gain: 0.28,
-    oscs: [{ type: "triangle", amp: 1 }, { type: "sine", mult: 2, amp: 0.45 }, { type: "sine", mult: 3, amp: 0.18 }, { type: "sine", mult: 4, amp: 0.08 }],
-    filter: { start: 7, end: 2, time: 1.2, min: 600 },
-    env: { a: 0.008, d: 0.25, s: 0.35, tail: 4.5, r: 0.22 },
-  },
+  { id: "piano", name: "Grand Piano", group: "keys", gain: 0.28, sample: "piano", ...pianoOsc },
+  { id: "synthpiano", name: "Synth Piano", group: "keys", gain: 0.28, ...pianoOsc },
   {
     id: "epiano", name: "Electric Piano", group: "keys", gain: 0.3,
     oscs: [{ type: "sine", amp: 1 }, { type: "sine", mult: 2, amp: 0.12 }],
@@ -94,10 +103,16 @@ export const PATCHES: Patch[] = [
     env: { a: 0.01, d: 0.2, s: 0.5, tail: 0, r: 0.12 },
   },
   {
-    id: "fingerbass", name: "Finger Bass", group: "bass", gain: 0.5,
+    id: "fingerbass", name: "Finger Bass", group: "bass", gain: 0.5, sample: "finger",
     oscs: [{ type: "triangle", amp: 1 }, { type: "sawtooth", amp: 0.3 }],
     filter: { start: 5, end: 1.5, time: 0.25, min: 150 },
     env: { a: 0.01, d: 0.35, s: 0.25, tail: 1.5, r: 0.14 },
+  },
+  {
+    id: "pickbass", name: "Picked Bass", group: "bass", gain: 0.48, sample: "pick",
+    oscs: [{ type: "triangle", amp: 1 }, { type: "sawtooth", amp: 0.45 }],
+    filter: { start: 8, end: 2, time: 0.18, min: 180 },
+    env: { a: 0.008, d: 0.22, s: 0.2, tail: 1.2, r: 0.12 },
   },
   {
     id: "upright", name: "Upright Bass", group: "bass", gain: 0.55,
@@ -133,7 +148,186 @@ export const useSound = create<SoundState>(() => ({
   split: 48,
   ...saved,
 }));
-useSound.subscribe((s) => localStorage.setItem("keystream.sound", JSON.stringify(s)));
+
+export const useSamples = create<{ pending: Record<SampleId, number> }>(() => ({
+  pending: { piano: 0, finger: 0, pick: 0 },
+}));
+
+function sampleUrl(file: string): string {
+  const base = import.meta.env.BASE_URL || "/";
+  return `${base}${base.endsWith("/") ? "" : "/"}${file}`;
+}
+
+function zoneFor(program: SampleProgram, midi: number): SampleZone {
+  for (const zone of program.zones) {
+    if (midi >= zone.lo && midi <= zone.hi) return zone;
+  }
+  if (midi < program.zones[0].lo) return program.zones[0];
+  return program.zones[program.zones.length - 1];
+}
+
+async function pool<T>(items: T[], limit: number, fn: (item: T) => Promise<void>) {
+  if (!items.length) return;
+  let cursor = 0;
+  const n = Math.min(limit, items.length);
+  await Promise.all(
+    Array.from({ length: n }, async () => {
+      for (;;) {
+        const i = cursor++;
+        if (i >= items.length) return;
+        await fn(items[i]);
+      }
+    }),
+  );
+}
+
+/** Fetches compressed recordings up front and decodes them once an AudioContext exists. */
+class SampleCache {
+  ctx: AudioContext | null = null;
+  private compressed = new Map<string, ArrayBuffer>();
+  private decoded = new Map<string, AudioBuffer>();
+  private failed = new Set<string>();
+  private attempts = new Map<string, number>();
+  private fetching = new Map<string, Promise<void>>();
+  private queue: string[] = [];
+  private queued = new Set<string>();
+  private urgent = new Set<string>();
+  private active = 0;
+  private started = new Set<SampleId>();
+
+  private noteUrls(id: SampleId): string[] {
+    const urls: string[] = [];
+    for (const zone of PROGRAMS[id].zones) {
+      for (const layer of zone.layers) urls.push(sampleUrl(layer.file));
+    }
+    return urls;
+  }
+
+  private releaseUrls(id: SampleId): string[] {
+    return PROGRAMS[id].releases.map(sampleUrl);
+  }
+
+  get(url: string): AudioBuffer | undefined {
+    return this.decoded.get(url);
+  }
+
+  ensure(id: SampleId) {
+    if (this.started.has(id)) {
+      this.pump();
+      return;
+    }
+    this.started.add(id);
+    this.refresh();
+    const notes = this.noteUrls(id);
+    const rels = this.releaseUrls(id);
+    void this.fetchMany(notes).then(() => this.fetchMany(rels));
+  }
+
+  /** Decode this layer before the rest of the queue when a note asks for it. */
+  prioritize(url: string) {
+    this.urgent.add(url);
+    this.enqueue(url, true);
+  }
+
+  private async fetchMany(urls: string[]) {
+    const pending = urls.filter((url) => !this.decoded.has(url) && !this.compressed.has(url) && !this.failed.has(url));
+    await pool(pending, 6, (url) => this.fetchOne(url));
+    this.pump();
+  }
+
+  private async fetchOne(url: string) {
+    const existing = this.fetching.get(url);
+    if (existing) return existing;
+    const job = (async () => {
+      for (let n = (this.attempts.get(url) ?? 0) + 1; n <= 4; n++) {
+        this.attempts.set(url, n);
+        try {
+          const res = await fetch(url);
+          if (!res.ok) throw new Error(String(res.status));
+          const buf = await res.arrayBuffer();
+          if (buf.byteLength < 32) throw new Error("empty");
+          this.failed.delete(url);
+          this.compressed.set(url, buf);
+          this.enqueue(url, false);
+          return;
+        } catch {
+          if (n >= 4) this.failed.add(url);
+          else await new Promise((r) => setTimeout(r, 200 * n));
+        }
+      }
+      this.refresh();
+    })();
+    this.fetching.set(url, job);
+    try {
+      await job;
+    } finally {
+      this.fetching.delete(url);
+    }
+  }
+
+  private enqueue(url: string, front: boolean) {
+    if (this.decoded.has(url) || this.failed.has(url) || !this.compressed.has(url)) return;
+    const goFront = front || this.urgent.has(url);
+    if (this.queued.has(url)) {
+      if (!goFront) return;
+      const i = this.queue.indexOf(url);
+      if (i > 0) {
+        this.queue.splice(i, 1);
+        this.queue.unshift(url);
+      }
+      this.pump();
+      return;
+    }
+    this.queued.add(url);
+    if (goFront) this.queue.unshift(url);
+    else this.queue.push(url);
+    this.pump();
+  }
+
+  pump() {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    while (this.active < 4 && this.queue.length) {
+      const url = this.queue.shift()!;
+      this.queued.delete(url);
+      if (this.decoded.has(url) || this.failed.has(url)) continue;
+      const raw = this.compressed.get(url);
+      if (!raw) continue;
+      this.active++;
+      void ctx
+        .decodeAudioData(raw.slice(0))
+        .then((buf) => {
+          this.decoded.set(url, buf);
+          this.compressed.delete(url);
+          this.urgent.delete(url);
+        })
+        .catch(() => {
+          this.failed.add(url);
+          this.compressed.delete(url);
+          console.warn("[audio] sample decode failed", url);
+        })
+        .finally(() => {
+          this.active--;
+          this.refresh();
+          this.pump();
+        });
+    }
+  }
+
+  private refresh() {
+    const pending: Record<SampleId, number> = { piano: 0, finger: 0, pick: 0 };
+    for (const id of this.started) {
+      let n = 0;
+      for (const url of this.noteUrls(id)) {
+        if (!this.decoded.has(url) && !this.failed.has(url)) n++;
+      }
+      pending[id] = n;
+    }
+    useSamples.setState({ pending });
+  }
+}
+
+const cache = new SampleCache();
 
 interface Voice {
   id: number;
@@ -142,8 +336,11 @@ interface Voice {
   start: number;
   end: number;
   amp: GainNode;
-  oscs: OscillatorNode[];
+  oscs: AudioScheduledSourceNode[];
   release: number;
+  velocity: number;
+  /** Piano recordings play a quiet hammer-release sample when the player lets go. */
+  hammerOnRelease: boolean;
 }
 
 const CLIP = (() => {
@@ -182,11 +379,25 @@ class Synth {
       this.ctx = ctx;
     }
     if (this.ctx.state === "suspended") void this.ctx.resume();
+    cache.ctx = this.ctx;
     return this.ctx;
   }
 
   unlock() {
     this.ensure();
+    this.warm();
+  }
+
+  /** Fetch and decode the recordings for the instruments the player currently has selected. */
+  warm() {
+    cache.ctx = this.ctx;
+    const s = useSound.getState();
+    const ids = new Set<SampleId>();
+    const key = byId(s.keys);
+    const bass = byId(s.bass);
+    if (key.sample) ids.add(key.sample);
+    if (s.splitOn && bass.sample) ids.add(bass.sample);
+    for (const id of ids) cache.ensure(id);
   }
 
   private patchFor(midi: number): Patch {
@@ -278,10 +489,133 @@ class Synth {
     if (!ctx) return;
     const time = ctx.currentTime;
     for (const v of this.voices) {
-      if (v.midi !== midi || v.end <= time) continue;
+      if (v.midi !== midi) continue;
+      if (!v.live && v.end <= time) continue;
       if (v.start > time + 0.002) this.kill(v, time);
       else this.fadeNow(v, 0.018);
     }
+  }
+
+  /**
+   * Play a recorded note. Returns false when that layer is not decoded yet so the
+   * oscillator patch can cover the gap. A decoded sibling layer is used first.
+   */
+  private playSample(id: SampleId, midi: number, velocity: number, sustainSec?: number): boolean {
+    const ctx = this.ctx;
+    if (!ctx) return false;
+    const program = PROGRAMS[id];
+    const zone = zoneFor(program, midi);
+    const vel = Math.max(1, Math.min(127, Math.round(velocity * 127)));
+    const layers = [...zone.layers].sort((a, b) => {
+      const exact = (layer: { lo: number; hi: number }) => (vel >= layer.lo && vel <= layer.hi ? 0 : 1);
+      const byExact = exact(a) - exact(b);
+      if (byExact) return byExact;
+      const center = (layer: { lo: number; hi: number }) => (layer.lo + layer.hi) / 2;
+      return Math.abs(center(a) - vel) - Math.abs(center(b) - vel);
+    });
+    let buffer: AudioBuffer | undefined;
+    let offset = 0;
+    let missing: string | null = null;
+    for (const layer of layers) {
+      const url = sampleUrl(layer.file);
+      const decoded = cache.get(url);
+      if (decoded) {
+        buffer = decoded;
+        offset = layer.offset;
+        break;
+      }
+      if (!missing) missing = url;
+    }
+    if (missing) cache.prioritize(missing);
+    if (!buffer) {
+      cache.ensure(id);
+      return false;
+    }
+    const rate = 2 ** ((midi - zone.root) / 12);
+    const startAt = Math.min(Math.max(0, offset), Math.max(0, buffer.duration - 0.01));
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    src.playbackRate.value = rate;
+    const amp = ctx.createGain();
+    const peak = Math.max(program.gain * ((1 - program.velTrack) + program.velTrack * velocity), SILENT * 8);
+    amp.gain.value = SILENT;
+    src.connect(amp).connect(this.master);
+    const now = ctx.currentTime + 0.01;
+    amp.gain.setValueAtTime(SILENT, now);
+    amp.gain.linearRampToValueAtTime(peak, now + 0.004);
+    let stopAt = now + (buffer.duration - startAt) / rate + 0.05;
+    let live = true;
+    if (sustainSec !== undefined) {
+      const short = Math.min(zone.release, 0.22);
+      const relAt = now + Math.max(sustainSec, 0.03);
+      amp.gain.setValueAtTime(peak, relAt);
+      amp.gain.exponentialRampToValueAtTime(SILENT, relAt + short);
+      stopAt = relAt + short + 0.03;
+      live = false;
+    }
+    try {
+      src.start(now, startAt);
+      if (!live) src.stop(stopAt);
+    } catch (err) {
+      try {
+        src.disconnect();
+        amp.disconnect();
+      } catch {
+        /* node already detached */
+      }
+      console.warn("[audio] sample playback failed", err);
+      return false;
+    }
+    this.voices.push({
+      id: this.nextId++,
+      midi,
+      live,
+      start: now,
+      end: stopAt,
+      amp,
+      oscs: [src],
+      release: zone.release,
+      velocity,
+      hammerOnRelease: id === "piano",
+    });
+    return true;
+  }
+
+  private playHammer(midi: number, velocity: number) {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const files = PROGRAMS.piano.releases;
+    const idx = midi - 21;
+    if (idx < 0 || idx >= files.length) return;
+    const buf = cache.get(sampleUrl(files[idx]));
+    if (!buf) return;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const amp = ctx.createGain();
+    const peak = Math.max(0.05 * velocity, SILENT * 4);
+    amp.gain.value = SILENT;
+    src.connect(amp).connect(this.master);
+    const now = ctx.currentTime + 0.005;
+    const stopAt = now + buf.duration + 0.02;
+    amp.gain.setValueAtTime(SILENT, now);
+    amp.gain.linearRampToValueAtTime(peak, now + 0.003);
+    try {
+      src.start(now);
+    } catch {
+      return;
+    }
+    this.voices.push({
+      id: this.nextId++,
+      midi,
+      live: false,
+      start: now,
+      end: stopAt,
+      amp,
+      oscs: [src],
+      release: 0.05,
+      velocity,
+      hammerOnRelease: false,
+    });
   }
 
   noteOn(midi: number, velocity = 0.8, sustainSec?: number) {
@@ -290,6 +624,7 @@ class Synth {
     this.chokeSame(midi);
     this.prune();
     const patch = this.patchFor(midi);
+    if (patch.sample && this.playSample(patch.sample, midi, velocity, sustainSec)) return;
     const freq = 440 * 2 ** ((midi - 69) / 12);
     const { env } = patch;
     const attack = Math.max(env.a, 0.008);
@@ -301,7 +636,7 @@ class Synth {
     const amp = ctx.createGain();
     amp.gain.value = SILENT;
     let out: AudioNode = amp;
-    const oscs: OscillatorNode[] = [];
+    const oscs: AudioScheduledSourceNode[] = [];
     if (patch.tremolo) {
       const trem = ctx.createGain();
       trem.gain.value = 1 - patch.tremolo.depth / 2;
@@ -390,16 +725,21 @@ class Synth {
     }
 
     for (const o of oscs) o.start(now);
-    const v: Voice = { id: this.nextId++, midi, live, start: now, end: stopAt, amp, oscs, release };
+    const v: Voice = { id: this.nextId++, midi, live, start: now, end: stopAt, amp, oscs, release, velocity, hammerOnRelease: false };
     if (!live) this.stopOscs(v, stopAt);
     this.voices.push(v);
   }
 
   noteOff(midi: number) {
+    if (!this.ctx) return;
     for (let i = this.voices.length - 1; i >= 0; i--) {
       const v = this.voices[i];
       if (v.midi === midi && v.live) {
+        const held = this.ctx.currentTime - v.start;
+        const hammer = v.hammerOnRelease;
+        const velocity = v.velocity;
         this.fadeNow(v, v.release);
+        if (hammer && held >= 0.05) this.playHammer(midi, velocity);
         break;
       }
     }
@@ -432,3 +772,10 @@ class Synth {
 }
 
 export const synth = new Synth();
+
+useSound.subscribe((s) => {
+  localStorage.setItem("keystream.sound", JSON.stringify(s));
+  synth.warm();
+});
+
+if (typeof window !== "undefined") synth.warm();

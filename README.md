@@ -19,15 +19,20 @@ Buy Me a Coffee and the sponsor card are set in `src/lib/sponsors.ts`. Change `C
 
 ## Features
 
-- Web MIDI input with hot-plug, built-in WebAudio piano synth (no samples to download)
+- Web MIDI input with hot-plug. The grand piano and electric basses are recordings included with the app; the other instruments are WebAudio synths, which also play until a recording has finished loading
 - 60fps canvas falling-notes view and 88-key-aware keyboard
 - Modes: Play along (timing window judging), Wait (pauses until you play the chord), Call & response (plays two bars, then waits for you to play them back; Space or Enter starts the next part)
 - Hand selection (a hand that is off is dimmed and silent), tempo, metronome, count-in, A/B bar loop
 - Demo song (Ode to Joy) and Standard MIDI file import
+
+## Sounds
+
+Grand Piano uses Salamander Grand Piano by Alexander Holm (CC BY 3.0). Finger Bass and Picked Bass use Andrea Biasior's Yamaha RBX recordings (CC0). See `public/samples/CREDITS.txt`. Synth Piano and the other patches stay synthesized. Rebuild the recordings with `npm run fetch-samples`.
 
 ## Layout
 
 - `src/lib/song.ts` – internal song model, demo song, MIDI parsing
 - `src/lib/engine.ts` – clock, modes, judging (kept outside React)
 - `src/lib/renderer.ts` – canvas renderer
-- `src/lib/midi.ts`, `src/lib/audio.ts` – input and sound
+- `src/lib/midi.ts`, `src/lib/audio.ts`, `src/lib/sampleBank.ts` – input, synth, and sampled piano and bass
+- `public/samples/` – recordings shipped with the app (`CREDITS.txt`)
