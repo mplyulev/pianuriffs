@@ -211,6 +211,7 @@ const KEYMAP: Record<string, number> = {
 };
 
 export const useKeyboardOctave = create<{ octave: number }>(() => ({ octave: getSession().octave }));
+useKeyboardOctave.subscribe((s) => patchSession({ octave: s.octave }));
 
 export function installComputerKeyboard() {
   const down = new Map<string, number>();
