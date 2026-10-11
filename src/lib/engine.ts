@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import { type Hand, type Song } from "./song";
-import { synth, useSound } from "./audio";
+import { handSplitMidi, type Hand, type Song } from "./song";
+import { setSongSplit, synth, useSound } from "./audio";
 import { onNote, type NoteEvent } from "./midi";
 import { getSession, patchSession, persistSongPrefs, prefsForSong, rememberSong, recordSongRun, songFromSession } from "./session";
 
@@ -148,6 +148,7 @@ class Engine {
   }
 
   private loadSong(song: Song) {
+    setSongSplit(handSplitMidi(song));
     this.status = new Uint8Array(song.notes.length);
     this.stats = { ...freshStats };
     this.timing = [];
@@ -468,7 +469,7 @@ class Engine {
     while (this.audioIdx < notes.length && notes[this.audioIdx].start <= next) {
       const n = notes[this.audioIdx++];
       const idx = this.audioIdx - 1;
-      if (hearScore && this.isRequired(idx)) synth.noteOn(n.midi, n.vel ?? 0.7, n.dur / bps, "app");
+      if (hearScore && this.isRequired(idx)) synth.noteOn(n.midi, n.vel ?? 0.7, n.dur / bps, "app", n.hand);
     }
     if (replyAt !== null) {
       this.beginReply(replyAt);

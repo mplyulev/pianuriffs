@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { PROGRAMS, type SampleId, type SampleLayer, type SampleProgram, type SampleZone } from "./sampleBank";
+import type { Hand } from "./song";
 
 export interface Patch {
   id: string;
@@ -28,6 +29,8 @@ interface SoundState {
   bass: string;
   splitOn: boolean;
   split: number;
+  /** Once the split slider is moved, pitch split replaces left-hand-as-bass. */
+  splitTouched: boolean;
   /** Keyboard / MIDI you play. */
   youVol: number;
   /** Score notes the app plays back. */
@@ -52,12 +55,25 @@ const initialSound: SoundState = {
   keys: typeof saved.keys === "string" && PATCH_IDS.has(saved.keys) ? saved.keys : "piano",
   bass: typeof saved.bass === "string" && PATCH_IDS.has(saved.bass) ? saved.bass : "fingerbass",
   splitOn: Boolean(saved.splitOn),
-  split: typeof saved.split === "number" && saved.split >= 36 && saved.split <= 72 ? saved.split : 48,
+  split: typeof saved.split === "number" && saved.split >= 28 && saved.split <= 84 ? saved.split : 48,
+  splitTouched: Boolean(saved.splitTouched),
   youVol: clamp01(saved.youVol, 0.8),
   appVol: clamp01(saved.appVol, 1),
 };
 
 export const useSound = create<SoundState>(() => initialSound);
+
+/** Derived L/R break for the current song. Used until the player moves the split slider. */
+let songSplit = 48;
+
+export function setSongSplit(midi: number | null) {
+  songSplit = midi ?? 48;
+}
+
+export function cueSplit() {
+  const s = useSound.getState();
+  return s.splitTouched ? s.split : songSplit;
+}
 
 if (saved.keys !== initialSound.keys || saved.bass !== initialSound.bass) {
   try {
@@ -352,9 +368,11 @@ class Synth {
     for (const id of ids) cache.ensure(id);
   }
 
-  private patchFor(midi: number): Patch {
+  private patchFor(midi: number, hand?: Hand): Patch {
     const s = useSound.getState();
-    return s.splitOn && midi < s.split ? byId(s.bass) : byId(s.keys);
+    if (!s.splitOn) return byId(s.keys);
+    if (!s.splitTouched && hand) return hand === "L" ? byId(s.bass) : byId(s.keys);
+    return midi < cueSplit() ? byId(s.bass) : byId(s.keys);
   }
 
   private prune() {
@@ -580,7 +598,7 @@ class Synth {
     });
   }
 
-  noteOn(midi: number, velocity = 0.8, sustainSec?: number, bus: MixBus = "you") {
+  noteOn(midi: number, velocity = 0.8, sustainSec?: number, bus: MixBus = "you", hand?: Hand) {
     const ctx = this.ensure();
     if (ctx.state !== "running") console.warn("[midi] audio context", ctx.state);
     // Backing notes pass a duration. If the player already struck this key, keep
@@ -589,7 +607,7 @@ class Synth {
     if (bus === "app" && this.playerHas(midi)) return;
     this.chokeSame(midi, bus === "app" ? "app" : undefined);
     this.prune();
-    const patch = this.patchFor(midi);
+    const patch = this.patchFor(midi, hand);
     this.playSample(patch.sample, midi, velocity, sustainSec, bus);
   }
 
@@ -614,7 +632,8 @@ class Synth {
 
   preview() {
     const s = useSound.getState();
-    const notes = s.splitOn ? [s.split - 12, 60, 64, 67] : [60, 64, 67];
+    const split = cueSplit();
+    const notes = s.splitOn ? [Math.max(21, split - 12), 60, 64, 67] : [60, 64, 67];
     notes.forEach((m, i) => setTimeout(() => this.noteOn(m, 0.7, 0.7), i * 90));
   }
 
@@ -637,7 +656,8 @@ class Synth {
 export const synth = new Synth();
 
 useSound.subscribe((s) => {
-  localStorage.setItem("keystream.sound", JSON.stringify(s));
+  const { keys, bass, splitOn, split, splitTouched, youVol, appVol } = s;
+  localStorage.setItem("keystream.sound", JSON.stringify({ keys, bass, splitOn, split, splitTouched, youVol, appVol }));
   synth.warm();
   synth.applyMix();
 });

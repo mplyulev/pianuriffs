@@ -28,6 +28,26 @@ export function noteNumber(name: string): number {
   return 12 * (Number(m[3]) + 1) + NAMES[m[1]] + acc;
 }
 
+/** MIDI note at the L/R break (bass is strictly below). Null if the song has no left hand. */
+export function handSplitMidi(song: Song): number | null {
+  let maxL = -Infinity;
+  let minR = Infinity;
+  let hasL = false;
+  let hasR = false;
+  for (const n of song.notes) {
+    if (n.hand === "L") {
+      hasL = true;
+      if (n.midi > maxL) maxL = n.midi;
+    } else {
+      hasR = true;
+      if (n.midi < minR) minR = n.midi;
+    }
+  }
+  if (!hasL) return null;
+  if (hasR && minR > maxL) return minR;
+  return maxL + 1;
+}
+
 export function finalize(song: Omit<Song, "length">): Song {
   const notes = [...song.notes].sort((a, b) => a.start - b.start || a.midi - b.midi);
   const length = notes.reduce((m, n) => Math.max(m, n.start + n.dur), 0);

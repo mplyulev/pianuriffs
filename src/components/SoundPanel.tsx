@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { PATCHES, synth, useSamples, useSound } from "../lib/audio";
 import { PROGRAMS } from "../lib/sampleBank";
+import { useEngine } from "../lib/engine";
+import { handSplitMidi } from "../lib/song";
 import { MixSliders } from "./MixSliders";
 
 const NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
@@ -17,7 +19,10 @@ export function SoundPanel() {
   const leaveTimer = useRef(0);
   const [box, setBox] = useState<{ top: number; right: number } | null>(null);
   const s = useSound();
+  const song = useEngine((st) => st.song);
   const pending = useSamples((st) => st.pending);
+  const splitValue = s.splitTouched ? s.split : (handSplitMidi(song) ?? s.split);
+  const splitClamped = Math.min(84, Math.max(28, splitValue));
   const keyPatch = PATCHES.find((p) => p.id === s.keys) ?? PATCHES[0];
   const bassPatch = PATCHES.find((p) => p.id === s.bass) ?? PATCHES.find((p) => p.group === "bass") ?? PATCHES[0];
   const loadingKeys = (pending[keyPatch.sample] ?? 0) > 0;
@@ -131,14 +136,25 @@ export function SoundPanel() {
               </label>
               <label className="block space-y-1.5">
                 <span className="flex justify-between text-[10px] font-semibold uppercase tracking-widest text-white/40">
-                  Split point <span className="text-white/70">{noteName(s.split)}</span>
+                  Split point <span className="text-white/70">{noteName(splitClamped)}{s.splitTouched ? "" : " · left hand"}</span>
                 </span>
-                <input type="range" min={36} max={72} step={1} value={s.split} onChange={(e) => set({ split: Number(e.target.value) })} className="w-full" />
+                <input
+                  type="range"
+                  min={28}
+                  max={84}
+                  step={1}
+                  value={splitClamped}
+                  onPointerDown={() => {
+                    if (!s.splitTouched) useSound.setState({ splitTouched: true, split: splitClamped });
+                  }}
+                  onChange={(e) => set({ split: Number(e.target.value), splitTouched: true })}
+                  className="w-full"
+                />
               </label>
             </div>
           </div>
           <p className="text-[11px] leading-relaxed text-white/40">
-            Applies to your playing and the app's backing. Notes below the split use the bass sound.
+            Split on: left-hand notes play bass, right hand plays the main sound. Moving the split point uses that pitch for your playing and the backing instead.
           </p>
           {loadingKeys || loadingBass ? (
             <p className="text-[11px] font-medium text-indigo-200/80">
