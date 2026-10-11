@@ -392,6 +392,15 @@ class Synth {
     this.stopOscs(v, v.end);
   }
 
+  /** The player is holding this key, including a note that has been scheduled but not heard yet. */
+  private playerHas(midi: number): boolean {
+    const time = this.ctx?.currentTime ?? 0;
+    for (const v of this.voices) {
+      if (v.midi === midi && v.live && v.end > time) return true;
+    }
+    return false;
+  }
+
   /** A second voice on the same key beats against the first and crackles. Crossfade it out. */
   private chokeSame(midi: number) {
     const ctx = this.ctx;
@@ -539,6 +548,10 @@ class Synth {
   noteOn(midi: number, velocity = 0.8, sustainSec?: number) {
     const ctx = this.ensure();
     if (ctx.state !== "running") console.warn("[midi] audio context", ctx.state);
+    // Backing notes pass a duration. If the player already struck this key, keep
+    // their note: replacing it with the softer backing sample is what cuts both out
+    // when the two starts land within a few milliseconds.
+    if (sustainSec !== undefined && this.playerHas(midi)) return;
     this.chokeSame(midi);
     this.prune();
     const patch = this.patchFor(midi);
