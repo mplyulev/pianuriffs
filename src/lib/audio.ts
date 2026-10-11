@@ -370,17 +370,14 @@ class Synth {
     }
     v.live = false;
     const g = v.amp.gain;
-    let held = SILENT;
-    try {
-      g.cancelAndHoldAtTime(time);
-      held = Math.max(g.value, SILENT);
-    } catch {
-      g.cancelScheduledValues(time);
-      held = Math.max(g.value, SILENT);
-      g.setValueAtTime(held, time);
-    }
+    // Read the level first. cancelAndHoldAtTime followed by an exponential ramp
+    // collapses the note to silence in one block in Chrome, which is the click
+    // on keys the player releases. Playback never takes this path.
+    const held = Math.max(g.value, SILENT);
     const stopAt = time + Math.max(rel, 0.02);
     try {
+      g.cancelScheduledValues(time);
+      g.setValueAtTime(held, time);
       if (held <= SILENT * 2) g.linearRampToValueAtTime(SILENT, stopAt);
       else g.exponentialRampToValueAtTime(SILENT, stopAt);
     } catch {
