@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { PATCHES, synth, useSamples, useSound } from "../lib/audio";
 import { PROGRAMS } from "../lib/sampleBank";
+import { MixSliders } from "./MixSliders";
 
 const NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const noteName = (m: number) => `${NAMES[m % 12]}${Math.floor(m / 12) - 1}`;
@@ -99,11 +100,12 @@ export function SoundPanel() {
       {open && box && createPortal(
         <div
           ref={panel}
-          className="glass fixed z-[80] w-72 space-y-4 rounded-2xl p-4"
+          className="glass fixed z-[80] w-72 space-y-4 rounded-2xl p-4 [@media(orientation:landscape)_and_(max-height:520px)]:max-h-[min(420px,calc(100dvh-16px))] [@media(orientation:landscape)_and_(max-height:520px)]:overflow-y-auto"
           style={{ top: box.top, right: box.right }}
           onMouseEnter={() => window.clearTimeout(leaveTimer.current)}
           onMouseLeave={scheduleClose}
         >
+          <MixSliders />
           <label className="block space-y-1.5">
             <span className="text-[10px] font-semibold uppercase tracking-widest text-white/40">Instrument</span>
             <select className={select} value={s.keys} onChange={(e) => set({ keys: e.target.value })}>

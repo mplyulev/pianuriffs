@@ -3,6 +3,7 @@ import { engine, useEngine, type Mode } from "../lib/engine";
 import { synth } from "../lib/audio";
 import { barAt, barsOf } from "../lib/library";
 import { Group, Pill } from "./ui";
+import { MixSliders } from "./MixSliders";
 
 function Progress() {
   const fill = useRef<HTMLDivElement>(null);
@@ -177,9 +178,10 @@ export function Controls() {
             <span className="w-9 text-xs font-semibold tabular-nums text-white/70">{Math.round(s.speed * 100)}%</span>
           </div>
         </div>
+        <MixSliders />
         <div className="relative md:hidden">
           <Group label="More">
-            <Pill tone="amber" active={practice || s.metronome || s.countIn || !!s.loop} title="Metronome, count-in, loop, playback sound" onClick={() => setPractice((v) => !v)}>
+            <Pill tone="amber" active={practice || s.metronome || s.countIn || !!s.loop} title="Metronome, count-in, loop" onClick={() => setPractice((v) => !v)}>
               Practice
             </Pill>
           </Group>
@@ -188,7 +190,6 @@ export function Controls() {
           <Group label="Practice">
             <Pill tone="amber" active={s.metronome} onClick={() => set({ metronome: !s.metronome })}>Metronome</Pill>
             <Pill tone="amber" active={s.countIn} onClick={() => set({ countIn: !s.countIn })}>Count-in</Pill>
-            <Pill active={!s.appSound} onClick={() => set({ appSound: !s.appSound })}>{s.appSound ? "Sound on" : "Muted"}</Pill>
           </Group>
           <Group label="Loop">
             <Pill onClick={() => setLoopEdge("a")} title="Set loop start to current bar">A</Pill>
@@ -204,7 +205,6 @@ export function Controls() {
           <Group label="Practice">
             <Pill tone="amber" active={s.metronome} onClick={() => set({ metronome: !s.metronome })}>Metronome</Pill>
             <Pill tone="amber" active={s.countIn} onClick={() => set({ countIn: !s.countIn })}>Count-in</Pill>
-            <Pill active={!s.appSound} onClick={() => set({ appSound: !s.appSound })}>{s.appSound ? "Sound on" : "Muted"}</Pill>
           </Group>
           <Group label="Loop">
             <Pill onClick={() => setLoopEdge("a")} title="Set loop start to current bar">A</Pill>

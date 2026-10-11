@@ -78,16 +78,18 @@ export function TopBar() {
       <div className="col-start-2 row-start-1 flex max-w-full flex-nowrap items-center justify-end gap-2 overflow-x-auto sm:col-start-3 sm:max-w-none sm:flex-wrap sm:overflow-visible">
         {error && <span className="text-xs text-rose-300">{error}</span>}
         <div
-          className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium ${
+          className={`flex items-center gap-2 rounded-full px-2 py-1.5 text-xs font-medium sm:px-3 ${
             connected ? "bg-emerald-400/15 text-emerald-200" : "bg-white/6 text-white/50"
           }`}
           title="Computer keys: A–; (white/black via W E T Y U O P). Z/X shift octave."
         >
           <span className={`h-2 w-2 rounded-full ${connected ? "bg-emerald-400 shadow-[0_0_8px_#34d399]" : "bg-white/30"}`} />
-          {label}
-          {!connected && <span className="text-white/30">· oct {octave}</span>}
+          <span className="hidden sm:inline [@media(orientation:landscape)_and_(max-height:520px)]:hidden">{label}</span>
+          {!connected && <span className="hidden text-white/30 sm:inline [@media(orientation:landscape)_and_(max-height:520px)]:hidden">· oct {octave}</span>}
         </div>
-        <CoffeeButton />
+        <div className="[@media(orientation:landscape)_and_(max-height:520px)]:hidden">
+          <CoffeeButton />
+        </div>
         <SoundPanel />
         <LookPanel />
         <button
@@ -99,7 +101,7 @@ export function TopBar() {
         <input ref={fileRef} type="file" accept=".mid,.midi" hidden onChange={(e) => load(e.target.files?.[0])} />
         <button
           onClick={() => fileRef.current?.click()}
-          className="cursor-pointer rounded-lg bg-white/8 px-3 py-1.5 text-xs font-semibold text-white/80 transition hover:bg-white/15"
+          className="cursor-pointer rounded-lg bg-white/8 px-3 py-1.5 text-xs font-semibold text-white/80 transition hover:bg-white/15 [@media(orientation:landscape)_and_(max-height:520px)]:hidden"
         >
           Import MIDI
         </button>

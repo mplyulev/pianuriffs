@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { type Hand, type Song } from "./song";
-import { synth } from "./audio";
+import { synth, useSound } from "./audio";
 import { onNote, type NoteEvent } from "./midi";
 import { getSession, patchSession, persistSongPrefs, prefsForSong, rememberSong, recordSongRun, songFromSession } from "./session";
 
@@ -464,11 +464,11 @@ class Engine {
       }
     }
 
-    const hearScore = s.mode === "echo" ? this.echoPhase === "call" : s.appSound;
+    const hearScore = (s.mode === "echo" ? this.echoPhase === "call" : true) && useSound.getState().appVol > 0.008;
     while (this.audioIdx < notes.length && notes[this.audioIdx].start <= next) {
       const n = notes[this.audioIdx++];
       const idx = this.audioIdx - 1;
-      if (hearScore && this.isRequired(idx)) synth.noteOn(n.midi, (n.vel ?? 0.7) * 0.4, n.dur / bps);
+      if (hearScore && this.isRequired(idx)) synth.noteOn(n.midi, n.vel ?? 0.7, n.dur / bps, "app");
     }
     if (replyAt !== null) {
       this.beginReply(replyAt);

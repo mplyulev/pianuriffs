@@ -28,6 +28,10 @@ interface SoundState {
   bass: string;
   splitOn: boolean;
   split: number;
+  /** Keyboard / MIDI you play. */
+  youVol: number;
+  /** Score notes the app plays back. */
+  appVol: number;
 }
 
 const PATCH_IDS = new Set(PATCHES.map((p) => p.id));
@@ -40,11 +44,17 @@ const saved = (() => {
   }
 })();
 
+function clamp01(n: unknown, fallback: number) {
+  return typeof n === "number" && Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : fallback;
+}
+
 const initialSound: SoundState = {
   keys: typeof saved.keys === "string" && PATCH_IDS.has(saved.keys) ? saved.keys : "piano",
   bass: typeof saved.bass === "string" && PATCH_IDS.has(saved.bass) ? saved.bass : "fingerbass",
   splitOn: Boolean(saved.splitOn),
   split: typeof saved.split === "number" && saved.split >= 36 && saved.split <= 72 ? saved.split : 48,
+  youVol: clamp01(saved.youVol, 0.8),
+  appVol: clamp01(saved.appVol, 1),
 };
 
 export const useSound = create<SoundState>(() => initialSound);
@@ -249,6 +259,8 @@ class SampleCache {
 
 const cache = new SampleCache();
 
+type MixBus = "you" | "app";
+
 interface Voice {
   id: number;
   midi: number;
@@ -259,6 +271,7 @@ interface Voice {
   oscs: AudioScheduledSourceNode[];
   release: number;
   velocity: number;
+  bus: MixBus;
   /** Piano recordings play a quiet hammer-release sample when the player lets go. */
   hammerOnRelease: boolean;
 }
@@ -278,6 +291,8 @@ const CLIP = (() => {
 class Synth {
   private ctx: AudioContext | null = null;
   private master!: GainNode;
+  private youBus!: GainNode;
+  private appBus!: GainNode;
   private voices: Voice[] = [];
   private nextId = 1;
 
@@ -295,12 +310,29 @@ class Synth {
       shaper.oversample = "2x";
       this.master = ctx.createGain();
       this.master.gain.value = 0.55;
+      this.youBus = ctx.createGain();
+      this.appBus = ctx.createGain();
+      this.youBus.connect(this.master);
+      this.appBus.connect(this.master);
       this.master.connect(comp).connect(shaper).connect(ctx.destination);
       this.ctx = ctx;
+      this.applyMix();
     }
     if (this.ctx.state === "suspended") void this.ctx.resume();
     cache.ctx = this.ctx;
     return this.ctx;
+  }
+
+  applyMix() {
+    if (!this.ctx) return;
+    const s = useSound.getState();
+    const now = this.ctx.currentTime;
+    this.youBus.gain.setTargetAtTime(s.youVol, now, 0.03);
+    this.appBus.gain.setTargetAtTime(s.appVol, now, 0.03);
+  }
+
+  private dest(bus: MixBus) {
+    return bus === "app" ? this.appBus : this.youBus;
   }
 
   unlock() {
@@ -396,18 +428,19 @@ class Synth {
   private playerHas(midi: number): boolean {
     const time = this.ctx?.currentTime ?? 0;
     for (const v of this.voices) {
-      if (v.midi === midi && v.live && v.end > time) return true;
+      if (v.bus === "you" && v.midi === midi && v.live && v.end > time) return true;
     }
     return false;
   }
 
   /** A second voice on the same key beats against the first and crackles. Crossfade it out. */
-  private chokeSame(midi: number) {
+  private chokeSame(midi: number, bus?: MixBus) {
     const ctx = this.ctx;
     if (!ctx) return;
     const time = ctx.currentTime;
     for (const v of this.voices) {
       if (v.midi !== midi) continue;
+      if (bus && v.bus !== bus) continue;
       if (!v.live && v.end <= time) continue;
       if (v.start > time + 0.002) this.kill(v, time);
       else this.fadeNow(v, 0.018);
@@ -415,7 +448,7 @@ class Synth {
   }
 
   /** Play a recorded note. A missing layer stays silent — sampled instruments never fall back to oscillators. */
-  private playSample(id: SampleId, midi: number, velocity: number, sustainSec?: number): boolean {
+  private playSample(id: SampleId, midi: number, velocity: number, sustainSec?: number, bus: MixBus = "you"): boolean {
     const ctx = this.ctx;
     if (!ctx) return false;
     const program = PROGRAMS[id];
@@ -466,7 +499,7 @@ class Synth {
     const amp = ctx.createGain();
     const peak = Math.max(program.gain * ((1 - program.velTrack) + program.velTrack * velocity), SILENT * 8);
     amp.gain.value = SILENT;
-    src.connect(amp).connect(this.master);
+    src.connect(amp).connect(this.dest(bus));
     const now = ctx.currentTime + 0.01;
     amp.gain.setValueAtTime(SILENT, now);
     amp.gain.linearRampToValueAtTime(peak, now + 0.004);
@@ -503,6 +536,7 @@ class Synth {
       oscs: [src],
       release: zone.release,
       velocity,
+      bus,
       hammerOnRelease: id === "piano",
     });
     return true;
@@ -521,7 +555,7 @@ class Synth {
     const amp = ctx.createGain();
     const peak = Math.max(0.05 * velocity, SILENT * 4);
     amp.gain.value = SILENT;
-    src.connect(amp).connect(this.master);
+    src.connect(amp).connect(this.dest("you"));
     const now = ctx.currentTime + 0.005;
     const stopAt = now + buf.duration + 0.02;
     amp.gain.setValueAtTime(SILENT, now);
@@ -541,21 +575,22 @@ class Synth {
       oscs: [src],
       release: 0.05,
       velocity,
+      bus: "you",
       hammerOnRelease: false,
     });
   }
 
-  noteOn(midi: number, velocity = 0.8, sustainSec?: number) {
+  noteOn(midi: number, velocity = 0.8, sustainSec?: number, bus: MixBus = "you") {
     const ctx = this.ensure();
     if (ctx.state !== "running") console.warn("[midi] audio context", ctx.state);
     // Backing notes pass a duration. If the player already struck this key, keep
     // their note: replacing it with the softer backing sample is what cuts both out
     // when the two starts land within a few milliseconds.
-    if (sustainSec !== undefined && this.playerHas(midi)) return;
-    this.chokeSame(midi);
+    if (bus === "app" && this.playerHas(midi)) return;
+    this.chokeSame(midi, bus === "app" ? "app" : undefined);
     this.prune();
     const patch = this.patchFor(midi);
-    this.playSample(patch.sample, midi, velocity, sustainSec);
+    this.playSample(patch.sample, midi, velocity, sustainSec, bus);
   }
 
   noteOff(midi: number) {
@@ -604,6 +639,7 @@ export const synth = new Synth();
 useSound.subscribe((s) => {
   localStorage.setItem("keystream.sound", JSON.stringify(s));
   synth.warm();
+  synth.applyMix();
 });
 
 if (typeof window !== "undefined") synth.warm();
