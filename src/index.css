@@ -20,6 +20,42 @@ body {
 }
 .rise { animation: rise 0.45s ease both; }
 
+@keyframes note-fall {
+  0% { transform: translateY(-30vh); opacity: 0; }
+  14% { opacity: 1; }
+  82% { opacity: 0.85; }
+  100% { transform: translateY(105vh); opacity: 0; }
+}
+.welcome-note { animation: note-fall linear infinite; }
+
+@keyframes glow-drift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(6%, -8%, 0) scale(1.12); }
+}
+.welcome-glow { animation: glow-drift 9s ease-in-out infinite; }
+
+@keyframes halo {
+  0%, 100% { opacity: 0.35; transform: scale(0.86); }
+  50% { opacity: 0.85; transform: scale(1.12); }
+}
+.welcome-halo { animation: halo 3.2s ease-in-out infinite; }
+
+@keyframes sheen {
+  0% { transform: translateX(-140%); }
+  55%, 100% { transform: translateX(280%); }
+}
+.welcome-sheen { animation: sheen 2.8s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .rise,
+  .welcome-note,
+  .welcome-glow,
+  .welcome-halo,
+  .welcome-sheen {
+    animation: none;
+  }
+}
+
 .glass {
   background: rgba(20, 20, 40, 0.55);
   border: 1px solid rgba(255, 255, 255, 0.08);

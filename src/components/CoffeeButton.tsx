@@ -8,7 +8,7 @@ export function CoffeeButton({ prominent = false }: { prominent?: boolean }) {
       rel="noreferrer"
       className={
         prominent
-          ? "inline-flex items-center justify-center gap-2 rounded-full border border-amber-200/20 bg-amber-300/10 px-4 py-2.5 text-sm font-semibold text-amber-100 transition hover:bg-amber-300/20"
+          ? "inline-flex cursor-pointer items-center justify-center gap-2 rounded-full border border-amber-200/20 bg-amber-300/10 px-4 py-2.5 text-sm font-semibold text-amber-100 transition hover:bg-amber-300/20"
           : "inline-flex items-center gap-1.5 rounded-lg bg-amber-300/10 px-3 py-1.5 text-xs font-semibold text-amber-100 transition hover:bg-amber-300/20"
       }
       title="Buy me a coffee"
