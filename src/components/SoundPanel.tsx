@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { PATCHES, synth, useSamples, useSound } from "../lib/audio";
-import { SAMPLE_CREDIT } from "../lib/sampleBank";
+import { PROGRAMS } from "../lib/sampleBank";
 
 const NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const noteName = (m: number) => `${NAMES[m % 12]}${Math.floor(m / 12) - 1}`;
@@ -17,10 +17,12 @@ export function SoundPanel() {
   const [box, setBox] = useState<{ top: number; right: number } | null>(null);
   const s = useSound();
   const pending = useSamples((st) => st.pending);
-  const loadingPiano = s.keys === "piano" && pending.piano > 0;
-  const loadingBass =
-    s.splitOn && ((s.bass === "fingerbass" && pending.finger > 0) || (s.bass === "pickbass" && pending.pick > 0));
-  const sampled = s.keys === "piano" || (s.splitOn && (s.bass === "fingerbass" || s.bass === "pickbass"));
+  const keyPatch = PATCHES.find((p) => p.id === s.keys) ?? PATCHES[0];
+  const bassPatch = PATCHES.find((p) => p.id === s.bass) ?? PATCHES.find((p) => p.group === "bass") ?? PATCHES[0];
+  const loadingKeys = (pending[keyPatch.sample] ?? 0) > 0;
+  const loadingBass = s.splitOn && bassPatch.sample !== keyPatch.sample && (pending[bassPatch.sample] ?? 0) > 0;
+  const credits = [PROGRAMS[keyPatch.sample].credit];
+  if (s.splitOn && bassPatch.sample !== keyPatch.sample) credits.push(PROGRAMS[bassPatch.sample].credit);
   const set = (patch: Partial<typeof s>) => {
     useSound.setState(patch);
     synth.unlock();
@@ -103,9 +105,9 @@ export function SoundPanel() {
           onMouseLeave={scheduleClose}
         >
           <label className="block space-y-1.5">
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-white/40">Keys instrument</span>
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-white/40">Instrument</span>
             <select className={select} value={s.keys} onChange={(e) => set({ keys: e.target.value })}>
-              {PATCHES.filter((p) => p.group === "keys").map((p) => (
+              {PATCHES.map((p) => (
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
@@ -136,12 +138,12 @@ export function SoundPanel() {
           <p className="text-[11px] leading-relaxed text-white/40">
             Applies to your playing and the app's backing. Notes below the split use the bass sound.
           </p>
-          {loadingPiano || loadingBass ? (
+          {loadingKeys || loadingBass ? (
             <p className="text-[11px] font-medium text-indigo-200/80">
-              {loadingPiano && loadingBass ? "Loading recordings…" : loadingPiano ? "Loading recorded piano…" : "Loading recorded bass…"}
+              {loadingKeys && loadingBass ? "Loading recordings…" : loadingKeys ? `Loading ${keyPatch.name}…` : `Loading ${bassPatch.name}…`}
             </p>
           ) : null}
-          {sampled ? <p className="text-[10px] leading-relaxed text-white/35">{SAMPLE_CREDIT}</p> : null}
+          <p className="text-[10px] leading-relaxed text-white/35">{credits.join(" ")}</p>
         </div>,
         document.body,
       )}

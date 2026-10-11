@@ -1,5 +1,8 @@
 Keystream instrument recordings
 
+Every instrument in the Sounds menu is one of these recordings.
+The metronome click is a short tone generated in the browser.
+
 Grand piano
   Salamander Grand Piano V3
   Recorded by Alexander Holm (Yamaha C5)
@@ -17,4 +20,29 @@ Electric bass
   License: CC0 1.0 (public domain)
   Source: https://github.com/freepats/electric-bass-YR
 
-The other Keystream instruments are synthesized in the browser.
+Strings
+  VSCO 2 Community Edition by Versilian Studios (Sam Gossner)
+  Violin section and the low cello section, sustained with vibrato
+  License: CC0 1.0 (public domain)
+  Source: https://github.com/sgossner/VSCO-2-CE
+
+FM piano
+  FreePats FM Piano 1
+  DX7 "E. Piano 1" imitation recorded by Roberto (roberto@zenvoid.org)
+  License: CC0 1.0 (public domain)
+  Source: https://github.com/freepats/fm-piano1
+
+Synth strings
+  FreePats Synth Strings 1 (ZynAddSubFX recordings)
+  License: CC0 1.0 (public domain)
+  Source: https://github.com/freepats/synth-strings-1
+
+Synth pad
+  FreePats Sweep Pad
+  License: CC0 1.0 (public domain)
+  Source: https://github.com/freepats/sweep-pad
+
+Synth brass
+  FreePats Synth Brass 1
+  License: CC0 1.0 (public domain)
+  Source: https://github.com/freepats/synth-brass-1

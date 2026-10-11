@@ -1,125 +1,22 @@
 import { create } from "zustand";
-import { PROGRAMS, type SampleId, type SampleProgram, type SampleZone } from "./sampleBank";
-
-interface Osc {
-  type: OscillatorType;
-  mult?: number;
-  amp: number;
-  detune?: number;
-}
+import { PROGRAMS, type SampleId, type SampleLayer, type SampleProgram, type SampleZone } from "./sampleBank";
 
 export interface Patch {
   id: string;
   name: string;
   group: "keys" | "bass";
-  sample?: SampleId;
-  oscs: Osc[];
-  fm?: { ratio: number; index: number; decay: number };
-  filter?: { start: number; end: number; time: number; q?: number; min?: number };
-  env: { a: number; d: number; s: number; tail: number; r: number };
-  tremolo?: { rate: number; depth: number };
-  gain: number;
+  sample: SampleId;
 }
 
-const saw = (detune: number, amp = 1): Osc => ({ type: "sawtooth", amp, detune });
-
-const pianoOsc = {
-  oscs: [
-    { type: "triangle" as const, amp: 1 },
-    { type: "sine" as const, mult: 2, amp: 0.45 },
-    { type: "sine" as const, mult: 3, amp: 0.18 },
-    { type: "sine" as const, mult: 4, amp: 0.08 },
-  ],
-  filter: { start: 7, end: 2, time: 1.2, min: 600 },
-  env: { a: 0.008, d: 0.25, s: 0.35, tail: 4.5, r: 0.22 },
-};
-
 export const PATCHES: Patch[] = [
-  { id: "piano", name: "Grand Piano", group: "keys", gain: 0.28, sample: "piano", ...pianoOsc },
-  { id: "synthpiano", name: "Synth Piano", group: "keys", gain: 0.28, ...pianoOsc },
-  {
-    id: "epiano", name: "Electric Piano", group: "keys", gain: 0.3,
-    oscs: [{ type: "sine", amp: 1 }, { type: "sine", mult: 2, amp: 0.12 }],
-    fm: { ratio: 1, index: 1.6, decay: 0.7 },
-    env: { a: 0.008, d: 0.4, s: 0.4, tail: 3, r: 0.28 },
-    tremolo: { rate: 4.6, depth: 0.18 },
-  },
-  {
-    id: "organ", name: "Drawbar Organ", group: "keys", gain: 0.15,
-    oscs: [{ type: "sine", amp: 0.8 }, { type: "sine", mult: 2, amp: 0.6 }, { type: "sine", mult: 3, amp: 0.35 }, { type: "sine", mult: 4, amp: 0.25 }, { type: "sine", mult: 6, amp: 0.15 }],
-    env: { a: 0.012, d: 0.02, s: 1, tail: 0, r: 0.12 },
-    tremolo: { rate: 6.2, depth: 0.12 },
-  },
-  {
-    id: "clav", name: "Clavinet", group: "keys", gain: 0.22,
-    oscs: [saw(0), { type: "square", mult: 2, amp: 0.25 }],
-    filter: { start: 10, end: 3, time: 0.15, q: 2.2, min: 800 },
-    env: { a: 0.008, d: 0.12, s: 0.15, tail: 0.6, r: 0.1 },
-  },
-  {
-    id: "pad", name: "Warm Pad", group: "keys", gain: 0.11,
-    oscs: [saw(-9), saw(0), saw(9)],
-    filter: { start: 2, end: 5, time: 1.6, q: 1, min: 300 },
-    env: { a: 0.6, d: 0.5, s: 0.8, tail: 0, r: 1.2 },
-  },
-  {
-    id: "strings", name: "Strings", group: "keys", gain: 0.09,
-    oscs: [saw(-12), saw(-4), saw(4), saw(12)],
-    filter: { start: 5, end: 5, time: 0.1, min: 400 },
-    env: { a: 0.35, d: 0.3, s: 0.85, tail: 0, r: 0.6 },
-    tremolo: { rate: 5.2, depth: 0.08 },
-  },
-  {
-    id: "lead", name: "Synth Lead", group: "keys", gain: 0.15,
-    oscs: [saw(-6), saw(6), { type: "square", amp: 0.4 }],
-    filter: { start: 8, end: 4, time: 0.3, q: 3, min: 900 },
-    env: { a: 0.012, d: 0.15, s: 0.8, tail: 0, r: 0.18 },
-  },
-  {
-    id: "pluck", name: "Pluck Synth", group: "keys", gain: 0.2,
-    oscs: [saw(-5), saw(5)],
-    filter: { start: 12, end: 1.5, time: 0.35, q: 2, min: 500 },
-    env: { a: 0.008, d: 0.3, s: 0.15, tail: 0.5, r: 0.12 },
-  },
-  {
-    id: "marimba", name: "Marimba", group: "keys", gain: 0.4,
-    oscs: [{ type: "sine", amp: 1 }, { type: "sine", mult: 4, amp: 0.35 }],
-    env: { a: 0.006, d: 0.4, s: 0.001, tail: 0, r: 0.12 },
-  },
-  {
-    id: "bell", name: "Glass Bells", group: "keys", gain: 0.22,
-    oscs: [{ type: "sine", amp: 1 }, { type: "sine", mult: 2.76, amp: 0.5 }, { type: "sine", mult: 5.4, amp: 0.3 }],
-    env: { a: 0.006, d: 1.4, s: 0.001, tail: 0, r: 0.25 },
-  },
-  {
-    id: "sub", name: "Sub Bass", group: "bass", gain: 0.5,
-    oscs: [{ type: "sine", amp: 1 }, { type: "sine", mult: 2, amp: 0.15 }],
-    env: { a: 0.012, d: 0.3, s: 0.8, tail: 0, r: 0.16 },
-  },
-  {
-    id: "synthbass", name: "Synth Bass", group: "bass", gain: 0.3,
-    oscs: [saw(0), { type: "sine", mult: 0.5, amp: 0.8 }],
-    filter: { start: 6, end: 1.5, time: 0.25, q: 5, min: 120 },
-    env: { a: 0.01, d: 0.2, s: 0.5, tail: 0, r: 0.12 },
-  },
-  {
-    id: "fingerbass", name: "Finger Bass", group: "bass", gain: 0.5, sample: "finger",
-    oscs: [{ type: "triangle", amp: 1 }, { type: "sawtooth", amp: 0.3 }],
-    filter: { start: 5, end: 1.5, time: 0.25, min: 150 },
-    env: { a: 0.01, d: 0.35, s: 0.25, tail: 1.5, r: 0.14 },
-  },
-  {
-    id: "pickbass", name: "Picked Bass", group: "bass", gain: 0.48, sample: "pick",
-    oscs: [{ type: "triangle", amp: 1 }, { type: "sawtooth", amp: 0.45 }],
-    filter: { start: 8, end: 2, time: 0.18, min: 180 },
-    env: { a: 0.008, d: 0.22, s: 0.2, tail: 1.2, r: 0.12 },
-  },
-  {
-    id: "upright", name: "Upright Bass", group: "bass", gain: 0.55,
-    oscs: [{ type: "triangle", amp: 1 }, { type: "sine", mult: 2, amp: 0.3 }],
-    filter: { start: 3, end: 1.2, time: 0.2, min: 120 },
-    env: { a: 0.01, d: 0.25, s: 0.1, tail: 0.8, r: 0.12 },
-  },
+  { id: "piano", name: "Grand Piano", group: "keys", sample: "piano" },
+  { id: "fingerbass", name: "Finger Bass", group: "bass", sample: "finger" },
+  { id: "pickbass", name: "Picked Bass", group: "bass", sample: "pick" },
+  { id: "strings", name: "Strings", group: "keys", sample: "strings" },
+  { id: "fmpiano", name: "FM Piano", group: "keys", sample: "fmpiano" },
+  { id: "synthstrings", name: "Synth Strings", group: "keys", sample: "synthstrings" },
+  { id: "pad", name: "Synth Pad", group: "keys", sample: "pad" },
+  { id: "brass", name: "Synth Brass", group: "keys", sample: "brass" },
 ];
 
 const byId = (id: string) => PATCHES.find((p) => p.id === id) ?? PATCHES[0];
@@ -133,6 +30,8 @@ interface SoundState {
   split: number;
 }
 
+const PATCH_IDS = new Set(PATCHES.map((p) => p.id));
+
 const saved = (() => {
   try {
     return JSON.parse(localStorage.getItem("keystream.sound") ?? "{}") as Partial<SoundState>;
@@ -141,16 +40,31 @@ const saved = (() => {
   }
 })();
 
-export const useSound = create<SoundState>(() => ({
-  keys: "piano",
-  bass: "fingerbass",
-  splitOn: false,
-  split: 48,
-  ...saved,
-}));
+const initialSound: SoundState = {
+  keys: typeof saved.keys === "string" && PATCH_IDS.has(saved.keys) ? saved.keys : "piano",
+  bass: typeof saved.bass === "string" && PATCH_IDS.has(saved.bass) ? saved.bass : "fingerbass",
+  splitOn: Boolean(saved.splitOn),
+  split: typeof saved.split === "number" && saved.split >= 36 && saved.split <= 72 ? saved.split : 48,
+};
+
+export const useSound = create<SoundState>(() => initialSound);
+
+if (saved.keys !== initialSound.keys || saved.bass !== initialSound.bass) {
+  try {
+    localStorage.setItem("keystream.sound", JSON.stringify(initialSound));
+  } catch {
+    /* storage can be blocked */
+  }
+}
+
+function emptyPending(): Record<SampleId, number> {
+  const pending = {} as Record<SampleId, number>;
+  for (const id of Object.keys(PROGRAMS) as SampleId[]) pending[id] = 0;
+  return pending;
+}
 
 export const useSamples = create<{ pending: Record<SampleId, number> }>(() => ({
-  pending: { piano: 0, finger: 0, pick: 0 },
+  pending: emptyPending(),
 }));
 
 function sampleUrl(file: string): string {
@@ -159,11 +73,17 @@ function sampleUrl(file: string): string {
 }
 
 function zoneFor(program: SampleProgram, midi: number): SampleZone {
+  let nearest = program.zones[0];
+  let nearestDist = Infinity;
   for (const zone of program.zones) {
     if (midi >= zone.lo && midi <= zone.hi) return zone;
+    const dist = midi < zone.lo ? zone.lo - midi : midi - zone.hi;
+    if (dist < nearestDist) {
+      nearestDist = dist;
+      nearest = zone;
+    }
   }
-  if (midi < program.zones[0].lo) return program.zones[0];
-  return program.zones[program.zones.length - 1];
+  return nearest;
 }
 
 async function pool<T>(items: T[], limit: number, fn: (item: T) => Promise<void>) {
@@ -315,7 +235,7 @@ class SampleCache {
   }
 
   private refresh() {
-    const pending: Record<SampleId, number> = { piano: 0, finger: 0, pick: 0 };
+    const pending = emptyPending();
     for (const id of this.started) {
       let n = 0;
       for (const url of this.noteUrls(id)) {
@@ -418,14 +338,6 @@ class Synth {
     }
   }
 
-  /** Exponential when the change is real; a flat exponential ramp throws and clicks. */
-  private glide(param: AudioParam, from: number, to: number, time: number) {
-    const a = Math.max(from, SILENT);
-    const b = Math.max(to, SILENT);
-    if (b > a * 0.98 && b < a * 1.02) param.linearRampToValueAtTime(b, time);
-    else param.exponentialRampToValueAtTime(b, time);
-  }
-
   private stopOscs(v: Voice, when: number) {
     const t = Math.max(when, v.start);
     for (const o of v.oscs) {
@@ -496,10 +408,7 @@ class Synth {
     }
   }
 
-  /**
-   * Play a recorded note. Returns false when that layer is not decoded yet so the
-   * oscillator patch can cover the gap. A decoded sibling layer is used first.
-   */
+  /** Play a recorded note. A missing layer stays silent — sampled instruments never fall back to oscillators. */
   private playSample(id: SampleId, midi: number, velocity: number, sustainSec?: number): boolean {
     const ctx = this.ctx;
     if (!ctx) return false;
@@ -514,28 +423,40 @@ class Synth {
       return Math.abs(center(a) - vel) - Math.abs(center(b) - vel);
     });
     let buffer: AudioBuffer | undefined;
-    let offset = 0;
+    let chosen: SampleLayer | undefined;
     let missing: string | null = null;
     for (const layer of layers) {
       const url = sampleUrl(layer.file);
       const decoded = cache.get(url);
       if (decoded) {
         buffer = decoded;
-        offset = layer.offset;
+        chosen = layer;
         break;
       }
       if (!missing) missing = url;
     }
     if (missing) cache.prioritize(missing);
-    if (!buffer) {
+    if (!buffer || !chosen) {
       cache.ensure(id);
       return false;
     }
     const rate = 2 ** ((midi - zone.root) / 12);
-    const startAt = Math.min(Math.max(0, offset), Math.max(0, buffer.duration - 0.01));
+    const startAt = Math.min(Math.max(0, chosen.offset), Math.max(0, buffer.duration - 0.01));
     const src = ctx.createBufferSource();
     src.buffer = buffer;
     src.playbackRate.value = rate;
+    const loopStart = chosen.loopStart ?? 0;
+    const loopEnd = chosen.loopEnd ?? 0;
+    const looped = loopEnd > loopStart + 0.05;
+    if (looped) {
+      const end = Math.min(loopEnd, Math.max(0.06, buffer.duration - 0.001));
+      const start = Math.max(0, Math.min(loopStart, end - 0.05));
+      if (end > start + 0.05) {
+        src.loop = true;
+        src.loopStart = start;
+        src.loopEnd = end;
+      }
+    }
     const amp = ctx.createGain();
     const peak = Math.max(program.gain * ((1 - program.velTrack) + program.velTrack * velocity), SILENT * 8);
     amp.gain.value = SILENT;
@@ -543,7 +464,7 @@ class Synth {
     const now = ctx.currentTime + 0.01;
     amp.gain.setValueAtTime(SILENT, now);
     amp.gain.linearRampToValueAtTime(peak, now + 0.004);
-    let stopAt = now + (buffer.duration - startAt) / rate + 0.05;
+    let stopAt = src.loop ? now + 120 : now + (buffer.duration - startAt) / rate + 0.05;
     let live = true;
     if (sustainSec !== undefined) {
       const short = Math.min(zone.release, 0.22);
@@ -624,110 +545,7 @@ class Synth {
     this.chokeSame(midi);
     this.prune();
     const patch = this.patchFor(midi);
-    if (patch.sample && this.playSample(patch.sample, midi, velocity, sustainSec)) return;
-    const freq = 440 * 2 ** ((midi - 69) / 12);
-    const { env } = patch;
-    const attack = Math.max(env.a, 0.008);
-    const decay = Math.max(env.d, 0.02);
-    const release = Math.max(env.r, 0.05);
-    const peak = Math.max(patch.gain * (0.3 + 0.7 * velocity) * (patch.group === "keys" ? 1.15 - midi / 140 : 1), SILENT * 8);
-    const sus = Math.max(peak * env.s, SILENT);
-
-    const amp = ctx.createGain();
-    amp.gain.value = SILENT;
-    let out: AudioNode = amp;
-    const oscs: AudioScheduledSourceNode[] = [];
-    if (patch.tremolo) {
-      const trem = ctx.createGain();
-      trem.gain.value = 1 - patch.tremolo.depth / 2;
-      const lfo = ctx.createOscillator();
-      const lfoGain = ctx.createGain();
-      lfo.frequency.value = patch.tremolo.rate;
-      lfoGain.gain.value = patch.tremolo.depth / 2;
-      lfo.connect(lfoGain).connect(trem.gain);
-      oscs.push(lfo);
-      amp.connect(trem);
-      out = trem;
-    }
-    out.connect(this.master);
-
-    let input: AudioNode = amp;
-    if (patch.filter) {
-      const f = patch.filter;
-      const lp = ctx.createBiquadFilter();
-      lp.type = "lowpass";
-      lp.Q.value = f.q ?? 0.7;
-      const min = f.min ?? 200;
-      const start = Math.min(12000, Math.max(min, freq * f.start));
-      const end = Math.min(12000, Math.max(min, freq * f.end));
-      lp.frequency.value = start;
-      if (Math.abs(end - start) > 1) {
-        const sweep = Math.max(f.time, 0.02);
-        lp.frequency.exponentialRampToValueAtTime(Math.max(end, 1), ctx.currentTime + sweep);
-      }
-      lp.connect(amp);
-      input = lp;
-    }
-
-    let modGain: GainNode | null = null;
-    if (patch.fm) {
-      const mod = ctx.createOscillator();
-      modGain = ctx.createGain();
-      const depth = freq * patch.fm.index;
-      mod.frequency.value = freq * patch.fm.ratio;
-      modGain.gain.value = depth;
-      modGain.gain.exponentialRampToValueAtTime(Math.max(depth * 0.04, SILENT), ctx.currentTime + Math.max(patch.fm.decay, 0.02));
-      mod.connect(modGain);
-      oscs.push(mod);
-    }
-    for (const spec of patch.oscs) {
-      const o = ctx.createOscillator();
-      const g = ctx.createGain();
-      o.type = spec.type;
-      o.frequency.value = freq * (spec.mult ?? 1);
-      if (spec.detune) o.detune.value = spec.detune;
-      g.gain.value = spec.amp;
-      if (modGain) modGain.connect(o.frequency);
-      o.connect(g).connect(input);
-      oscs.push(o);
-    }
-
-    const now = ctx.currentTime + 0.01;
-    amp.gain.setValueAtTime(SILENT, now);
-    amp.gain.linearRampToValueAtTime(peak, now + attack);
-    const decayEnd = now + attack + decay;
-    let stopAt = now + 30;
-    let live = true;
-    if (sustainSec !== undefined) {
-      const want = now + Math.max(sustainSec, attack + 0.03);
-      if (want < decayEnd - 0.004) {
-        const u = Math.min(1, Math.max(0.001, (want - (now + attack)) / decay));
-        const mid = Math.max(peak * (sus / peak) ** u, SILENT);
-        const rel = Math.max(want, now + attack + 0.004);
-        this.glide(amp.gain, peak, mid, rel);
-        this.glide(amp.gain, mid, SILENT, rel + release);
-        stopAt = rel + release + 0.05;
-      } else {
-        this.glide(amp.gain, peak, sus, decayEnd);
-        const relAt = Math.max(want, decayEnd + 0.004);
-        amp.gain.linearRampToValueAtTime(sus, relAt);
-        this.glide(amp.gain, sus, SILENT, relAt + release);
-        stopAt = relAt + release + 0.05;
-      }
-      live = false;
-    } else if (env.tail > 0) {
-      this.glide(amp.gain, peak, sus, decayEnd);
-      this.glide(amp.gain, sus, SILENT, decayEnd + env.tail);
-      stopAt = decayEnd + env.tail + 0.05;
-      live = false;
-    } else {
-      this.glide(amp.gain, peak, sus, decayEnd);
-    }
-
-    for (const o of oscs) o.start(now);
-    const v: Voice = { id: this.nextId++, midi, live, start: now, end: stopAt, amp, oscs, release, velocity, hammerOnRelease: false };
-    if (!live) this.stopOscs(v, stopAt);
-    this.voices.push(v);
+    this.playSample(patch.sample, midi, velocity, sustainSec);
   }
 
   noteOff(midi: number) {
