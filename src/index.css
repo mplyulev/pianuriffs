@@ -20,34 +20,55 @@ body {
 }
 .rise { animation: rise 0.45s ease both; }
 
-@keyframes brick-fall {
-  0% { transform: translateY(-20vh); opacity: 0; }
-  12% { opacity: 1; }
-  88% { opacity: 1; }
-  100% { transform: translateY(112vh); opacity: 0; }
-}
-.welcome-brick { top: 0; animation: brick-fall linear infinite; }
-
-@keyframes glow-drift {
-  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
-  50% { transform: translate3d(3%, -4%, 0) scale(1.06); }
-}
-.welcome-glow { animation: glow-drift 18s ease-in-out infinite; }
-
 @keyframes sheen {
   0% { transform: translateX(-140%); }
   55%, 100% { transform: translateX(280%); }
 }
 .welcome-sheen { animation: sheen 2.8s ease-in-out infinite; }
 
+@keyframes welcome-spin {
+  to { transform: rotate(360deg); }
+}
+.welcome-card-shell {
+  position: relative;
+  padding: 1px;
+  border-radius: 2rem;
+  isolation: isolate;
+}
+.welcome-card-spin {
+  position: absolute;
+  inset: -18%;
+  z-index: -1;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, #22d3ee, #6366f1, #f472b6, #22d3ee);
+  filter: blur(18px);
+  opacity: 0.55;
+  animation: welcome-spin 9s linear infinite;
+}
+
+@keyframes logo-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+.welcome-logo-float {
+  animation: logo-float 4.2s ease-in-out infinite;
+  filter: drop-shadow(0 10px 18px rgba(99, 102, 241, 0.55));
+}
+
+@keyframes cta-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+.welcome-cta { animation: cta-shift 5.5s ease-in-out infinite; }
+
 @media (prefers-reduced-motion: reduce) {
   .rise,
-  .welcome-brick,
-  .welcome-glow,
-  .welcome-sheen {
+  .welcome-sheen,
+  .welcome-card-spin,
+  .welcome-logo-float,
+  .welcome-cta {
     animation: none;
   }
-  .welcome-brick { opacity: 0.85; }
 }
 
 .glass {

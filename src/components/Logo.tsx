@@ -6,7 +6,7 @@ export function Logo({ wordmark = false, stacked = false, light = false, size = 
         alt={wordmark ? "" : "pianoriffs"}
         width={size}
         height={size}
-        className="shrink-0 border-0"
+        className={`shrink-0 border-0 ${stacked ? "welcome-logo-float" : ""}`}
         style={{ width: size, height: size }}
       />
       {wordmark && (
