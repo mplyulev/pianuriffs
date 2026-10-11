@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { engine, useEngine, type Mode } from "../lib/engine";
 import { synth } from "../lib/audio";
+import { barAt, barsOf } from "../lib/library";
 import { Group, Pill } from "./ui";
 
 function Progress() {
@@ -17,8 +18,7 @@ function Progress() {
       const p = Math.max(0, engine.pos) / song.length;
       if (fill.current) fill.current.style.transform = `scaleX(${Math.min(1, p)})`;
       if (label.current) {
-        const bar = Math.max(0, Math.floor(engine.pos / song.beatsPerBar)) + 1;
-        label.current.textContent = `Bar ${bar} / ${Math.ceil(song.length / song.beatsPerBar - 0.08)}`;
+        label.current.textContent = `Bar ${barAt(engine.pos, song)} / ${barsOf(song)}`;
       }
     };
     raf = requestAnimationFrame(loopFn);
@@ -165,16 +165,30 @@ export function Controls() {
             <span className="w-9 text-xs font-semibold tabular-nums text-white/70">{Math.round(s.speed * 100)}%</span>
           </div>
         </div>
-        <div className="relative">
+        <div className="relative md:hidden">
           <Group label="More">
             <Pill tone="amber" active={practice || s.metronome || s.countIn || !!s.loop} title="Metronome, count-in, loop, playback sound" onClick={() => setPractice((v) => !v)}>
               Practice
             </Pill>
           </Group>
         </div>
+        <div className="hidden md:contents">
+          <Group label="Practice">
+            <Pill tone="amber" active={s.metronome} onClick={() => set({ metronome: !s.metronome })}>Metronome</Pill>
+            <Pill tone="amber" active={s.countIn} onClick={() => set({ countIn: !s.countIn })}>Count-in</Pill>
+            <Pill active={!s.appSound} onClick={() => set({ appSound: !s.appSound })}>{s.appSound ? "Sound on" : "Muted"}</Pill>
+          </Group>
+          <Group label="Loop">
+            <Pill onClick={() => setLoopEdge("a")} title="Set loop start to current bar">A</Pill>
+            <Pill onClick={() => setLoopEdge("b")} title="Set loop end to current bar">B</Pill>
+            <Pill tone="amber" active={!!s.loop} onClick={() => set({ loop: null })} title="Clear loop">
+              {s.loop ? "Clear" : "Off"}
+            </Pill>
+          </Group>
+        </div>
       </div>
       {practice && (
-        <div className="flex flex-wrap items-end gap-3 border-t border-white/8 pt-2">
+        <div className="flex flex-wrap items-end gap-3 border-t border-white/8 pt-2 md:hidden">
           <Group label="Practice">
             <Pill tone="amber" active={s.metronome} onClick={() => set({ metronome: !s.metronome })}>Metronome</Pill>
             <Pill tone="amber" active={s.countIn} onClick={() => set({ countIn: !s.countIn })}>Count-in</Pill>

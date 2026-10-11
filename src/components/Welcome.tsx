@@ -45,8 +45,8 @@ export function Welcome({ onEnter }: { onEnter: () => void }) {
             <h1 className="flex justify-center">
               <Logo wordmark stacked size={72} />
             </h1>
-            <p className="mt-4 text-base text-white/75">Falling notes, at your tempo.</p>
-            <p className="mx-auto mt-1 max-w-xs text-sm text-white/45">Plug in a MIDI keyboard, or play from the keys on your computer.</p>
+          <p className="mt-4 text-base text-white/75">Free piano practice — falling notes, at your tempo.</p>
+          <p className="mx-auto mt-1 max-w-xs text-sm text-white/45">Waterfall piano with MIDI or computer keys. Licks, riffs, and styles from classical to jazz and blues.</p>
 
             <div className="mt-5 flex items-center justify-center gap-2.5 text-sm text-white/80">
               <span className={`h-2 w-2 shrink-0 rounded-full ${connected ? "bg-emerald-400 shadow-[0_0_8px_#34d399]" : "bg-white/40"} ${midi.status === "idle" && midi.supported ? "animate-pulse" : ""}`} />

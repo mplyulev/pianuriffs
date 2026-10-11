@@ -23,7 +23,7 @@ export function Pill({
     <button
       title={title}
       onClick={onClick}
-      className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+      className={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
         active ? `${tones[tone]} ring-1` : "text-white/55 hover:bg-white/8 hover:text-white"
       }`}
     >

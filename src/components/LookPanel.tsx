@@ -97,7 +97,7 @@ export function LookPanel() {
     <div ref={root} className="relative" onMouseEnter={() => window.clearTimeout(leaveTimer.current)} onMouseLeave={scheduleClose}>
       <button
         onClick={() => setOpen((v) => !v)}
-        className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+        className={`flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
           open ? "bg-white/18 text-white" : "bg-white/8 text-white/80 hover:bg-white/15"
         }`}
         title="Note colors and background"

@@ -3,12 +3,38 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>pianoriffs — practice piano with MIDI</title>
+    <title>pianoriffs — free piano practice with waterfall notes &amp; licks</title>
+    <meta name="description" content="Free browser piano practice with a waterfall of falling notes. Play along with MIDI or your computer keyboard: classical, pop, jazz licks, blues, rock riffs, and scales. No account, no install." />
+    <meta name="keywords" content="piano practice, free piano practice, waterfall piano, falling notes piano, piano licks, MIDI piano, play along piano, jazz licks, blues licks, scales, riffs" />
+    <meta name="robots" content="index, follow" />
+    <meta property="og:title" content="pianoriffs — free piano practice" />
+    <meta property="og:description" content="Waterfall falling-notes piano practice in the browser. MIDI keyboard or computer keys. Styles, riffs, and licks. Free, no signup." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "pianoriffs",
+        "applicationCategory": "EducationalApplication",
+        "operatingSystem": "Any",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "description": "Free piano practice in the browser with waterfall falling notes, MIDI support, and licks across classical, pop, jazz, blues, rock, and scales."
+      }
+    </script>
   </head>
   <body>
+    <div class="seo-copy" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">
+      <h1>Free piano practice — waterfall falling notes and licks</h1>
+      <p>
+        pianoriffs is free piano practice in your browser. A waterfall of falling notes (sometimes called waterfall piano)
+        scrolls toward the keys. Plug in a MIDI keyboard or play with the computer keys. Practice classical pieces,
+        pop progressions, jazz licks, blues licks, rock riffs, scales, and other styles at your tempo. No account and no download.
+      </p>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

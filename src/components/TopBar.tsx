@@ -92,21 +92,21 @@ export function TopBar() {
         <LookPanel />
         <button
           onClick={() => setLibraryOpen(true)}
-          className="rounded-lg bg-gradient-to-r from-cyan-400/90 to-indigo-500/90 px-3.5 py-1.5 text-xs font-bold text-white shadow-md shadow-indigo-500/25 transition hover:brightness-110"
+          className="cursor-pointer rounded-lg bg-gradient-to-r from-cyan-400/90 to-indigo-500/90 px-3.5 py-1.5 text-xs font-bold text-white shadow-md shadow-indigo-500/25 transition hover:brightness-110"
         >
           Library
         </button>
         <input ref={fileRef} type="file" accept=".mid,.midi" hidden onChange={(e) => load(e.target.files?.[0])} />
         <button
           onClick={() => fileRef.current?.click()}
-          className="rounded-lg bg-white/8 px-3 py-1.5 text-xs font-semibold text-white/80 transition hover:bg-white/15"
+          className="cursor-pointer rounded-lg bg-white/8 px-3 py-1.5 text-xs font-semibold text-white/80 transition hover:bg-white/15"
         >
           Import MIDI
         </button>
         {song !== DEMO_SONG && (
           <button
             onClick={() => selectSong(DEMO_SONG)}
-            className="rounded-lg px-3 py-1.5 text-xs font-semibold text-white/50 hover:text-white"
+            className="cursor-pointer rounded-lg px-3 py-1.5 text-xs font-semibold text-white/50 hover:text-white"
           >
             Demo song
           </button>

@@ -94,7 +94,13 @@ export function loadItem(cat: Category, index: number): Song {
 }
 
 export function barsOf(song: Song) {
-  return Math.ceil(song.length / song.beatsPerBar - 0.08);
+  return Math.max(1, Math.ceil((song.length - 1e-4) / song.beatsPerBar));
+}
+
+export function barAt(pos: number, song: Song) {
+  const total = barsOf(song);
+  if (pos <= 0) return 1;
+  return Math.min(total, Math.floor(pos / song.beatsPerBar) + 1);
 }
 
 export function difficultyOf(song: Song): 1 | 2 | 3 | 4 | 5 {
