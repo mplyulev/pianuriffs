@@ -131,7 +131,7 @@ export class Renderer {
     let whites = 0;
     for (let m = this.lo; m <= this.hi; m++) if (!isBlack(m)) whites++;
     const ww = this.w / whites;
-    this.keyH = Math.max(90, Math.min(190, this.h * 0.2));
+    this.keyH = this.pianoHeight();
     this.canvas.parentElement?.style.setProperty("--keyh", `${this.keyH}px`);
     let wi = 0;
     for (let m = this.lo; m <= this.hi; m++) {
@@ -143,6 +143,15 @@ export class Renderer {
         wi++;
       }
     }
+  }
+
+  /** Keep keys as a thin strip on short landscape phones so falling notes have height. */
+  private pianoHeight() {
+    const { w, h } = this;
+    const landscape = w > h * 1.12;
+    if (landscape && h <= 520) return Math.round(Math.max(34, Math.min(50, h * 0.11)));
+    if (h <= 560) return Math.round(Math.max(64, Math.min(100, h * 0.16)));
+    return Math.round(Math.max(90, Math.min(190, h * 0.2)));
   }
 
   private pitchAt(x: number, y: number): number | null {
@@ -687,13 +696,14 @@ export class Renderer {
       g.addColorStop(1, bot);
       ctx.fillStyle = g;
       ctx.beginPath();
-      ctx.roundRect(k.x + (k.black ? 0 : 1), top + 2, k.w - (k.black ? 0 : 2), kh - 2, [0, 0, 5, 5]);
+      const radius = Math.max(2, Math.min(5, keyH * 0.08));
+      ctx.roundRect(k.x + (k.black ? 0 : 1), top + 1, k.w - (k.black ? 0 : 2), kh - 1, [0, 0, radius, radius]);
       ctx.fill();
-      if (!k.black && m % 12 === 0) {
+      if (!k.black && m % 12 === 0 && keyH >= 52) {
         ctx.fillStyle = stage.cLabel;
-        ctx.font = "600 10px Inter, system-ui, sans-serif";
+        ctx.font = `${keyH < 72 ? "600 8px" : "600 10px"} Inter, system-ui, sans-serif`;
         ctx.textAlign = "center";
-        ctx.fillText(`C${Math.floor(m / 12) - 1}`, k.x + k.w / 2, top + keyH - 10);
+        ctx.fillText(`C${Math.floor(m / 12) - 1}`, k.x + k.w / 2, top + keyH - Math.max(5, keyH * 0.11));
       }
     };
     for (const [m, k] of this.keys) if (!k.black) paint(m, k);

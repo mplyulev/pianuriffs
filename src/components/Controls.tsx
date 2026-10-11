@@ -66,9 +66,21 @@ export function Controls() {
     if (on || delay === 0) setHoverState(on);
     else closeTimer.current = window.setTimeout(() => setHoverState(false), delay);
   }, []);
-  const [minimized, setMinimized] = useState(false);
+  const [minimized, setMinimized] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(orientation: landscape) and (max-height: 520px)").matches,
+  );
   const [practice, setPractice] = useState(false);
   const collapsed = !hover && (s.playing || minimized);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(orientation: landscape) and (max-height: 520px)");
+    const apply = () => {
+      if (mq.matches) setMinimized(true);
+    };
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
 
   const toggleHand = (h: "L" | "R") => {
     const next = { ...s.hands, [h]: !s.hands[h] };
@@ -89,7 +101,7 @@ export function Controls() {
 
   return (
     <div
-      className="pointer-events-none absolute inset-x-0 bottom-[var(--keyh,150px)] flex justify-center px-3 pb-3 sm:px-4"
+      className="pointer-events-none absolute inset-x-0 bottom-[var(--keyh,150px)] flex justify-center px-3 pb-3 [@media(orientation:landscape)_and_(max-height:520px)]:pb-1 sm:px-4"
     >
       <div
         className={`pointer-events-auto w-full max-w-5xl ${collapsed ? "" : "pt-4"}`}

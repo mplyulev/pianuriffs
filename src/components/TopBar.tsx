@@ -58,19 +58,19 @@ export function TopBar() {
         }`}
       >
         <div className="overflow-hidden">
-          <header className="glass pointer-events-auto grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1.5 rounded-2xl px-4 py-2.5 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:gap-3">
+          <header className="glass pointer-events-auto grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1.5 rounded-2xl px-4 py-2.5 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] sm:gap-3 [@media(orientation:landscape)_and_(max-height:520px)]:py-1.5 [@media(orientation:landscape)_and_(max-height:520px)]:gap-y-0">
       <div className="col-start-1 row-start-1 flex min-w-0 items-center gap-3">
         <Logo size={36} />
         <div className="min-w-0 leading-tight">
           <div className="truncate text-sm font-bold tracking-tight">{song.title}</div>
-          <div className="truncate text-xs text-white/45">
+          <div className="truncate text-xs text-white/45 [@media(orientation:landscape)_and_(max-height:520px)]:hidden">
             {song.composer} · {song.bpm} BPM
           </div>
         </div>
       </div>
 
       <div
-        className={`col-span-2 row-start-2 justify-self-center overflow-hidden sm:col-span-1 sm:col-start-2 sm:row-start-1 max-h-10 max-w-[24rem]`}
+        className={`col-span-2 row-start-2 justify-self-center overflow-hidden sm:col-span-1 sm:col-start-2 sm:row-start-1 max-h-10 max-w-[24rem] [@media(orientation:landscape)_and_(max-height:520px)]:hidden`}
       >
         <Stats />
       </div>
